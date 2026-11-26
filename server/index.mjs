@@ -148,7 +148,7 @@ function streamAsset(url, res) {
   const file = path.join(ROOT, item[0]);
   if (!fs.existsSync(file))
     throw new AppError(
-      'An app asset is missing. Run npm install and restart minilearn.',
+      'An app asset is missing. Restart minilearn with npm start.',
       500,
     );
   res.writeHead(200, {

@@ -6,14 +6,13 @@ minilearn is derived from [LearnHarness](https://github.com/amosblomqvist/learnh
 
 ## Get started
 
-Install [Node.js](https://nodejs.org/) 22 or later, then run:
+Install [Node.js](https://nodejs.org/) 22 or later, open a terminal in the extracted minilearn folder, and run:
 
 ```sh
-npm ci --omit=dev
 npm start
 ```
 
-Open **http://127.0.0.1:3210** in your browser. The server listens on your computer only; no account or app subscription is required.
+The first launch automatically installs the runtime dependencies (internet access is needed once). Later launches reuse them without downloading anything unless an update requires new dependencies. Open **http://127.0.0.1:3210** in your browser. The server listens on your computer only; no account or app subscription is required.
 
 1. Click **Add a provider key** in the bottom dock, or open **Settings → Providers**. Choose OpenAI, Anthropic, Google Gemini, OpenCode, or an OpenAI-compatible endpoint. Paste a key if needed, find or enter a model, and test the connection. For local servers, minilearn provides Ollama, LM Studio, and llama.cpp presets.
 2. Create a learning project from the sidebar. Add modules and lessons yourself, paste an outline, or chat with the curriculum planner using the Curriculum button in the project toolbar. Review proposed changes before applying them.
@@ -31,7 +30,7 @@ Open **http://127.0.0.1:3210** in your browser. The server listens on your compu
 
 ## Data belongs to you
 
-By default, minilearn is fully portable: its code, installed dependencies, npm cache and logs, model credentials, and learning data stay under the application directory. Run `npm ci` and `npm start` from the installation directory. Set `MINILEARN_DATA_DIR` only if you deliberately want a different data location; set `PORT` to change the local server port.
+By default, minilearn is fully portable: its code, installed dependencies, npm cache and logs, model credentials, and learning data stay under the application directory. Run `npm start` from the installation directory. Set `MINILEARN_DATA_DIR` only if you deliberately want a different data location; set `PORT` to change the local server port.
 
 ```text
 minilearn/
