@@ -9,6 +9,29 @@ import http from 'node:http';
 import { createApp } from '../server/index.mjs';
 import { Storage } from '../server/storage.mjs';
 
+test('all interface typography uses the bundled monospaced font', () => {
+  const css = ['styles.css', 'workspace.css']
+    .map((name) =>
+      fs.readFileSync(new URL(`../web/${name}`, import.meta.url), 'utf8'),
+    )
+    .join('\n');
+  assert.match(css, /--font-ui:\s*'JetBrains Mono'/);
+  const families = [...css.matchAll(/font-family:\s*([^;]+);/g)].map(
+    (m) => m[1],
+  );
+  assert.ok(families.length > 2);
+  assert.ok(
+    families.every(
+      (family) => family === "'JetBrains Mono'" || family === 'var(--font-ui)',
+    ),
+  );
+  assert.ok(
+    [...css.matchAll(/\bfont:\s*([^;]+);/g)].every(
+      (m) => m[1] === 'inherit' || m[1].endsWith('var(--font-ui)'),
+    ),
+  );
+});
+
 // Exercise the real browser module against the real local API in a DOM.
 // This is an interaction test, not a browser layout or visual test.
 test('browser workflow: outline, quick model setup, tutor, map, AI insert, and data controls', async (t) => {
@@ -202,6 +225,8 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   assert.equal($('.wordmark').textContent, 'minilearn');
   assert.equal($('.brand svg'), null);
   assert.ok($('.sidebar') && $('#home-form') && !$('.topbar'));
+  assert.equal($$('.sidebar [data-action="new-project"]').length, 1);
+  assert.equal($('.session-search-row .icon-button'), null);
   click('[data-action="model-picker"]');
   assert.ok($('.model-picker-empty').textContent.includes('No models match'));
   click('[data-action="home"]');
@@ -218,6 +243,13 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   await wait(
     () => $('.workspace-project')?.textContent.includes('Linear Algebra'),
     'project created',
+  );
+  assert.equal($$('.sidebar [data-action="new-project"]').length, 1);
+  const moduleShortcut = $('.session-search-row [data-action="add-module"]');
+  assert.ok(moduleShortcut);
+  assert.notEqual(
+    moduleShortcut.querySelector('svg').innerHTML,
+    $('.workspace-picker [data-action="new-project"] svg').innerHTML,
   );
   click('[data-view="curriculum"]');
   await wait(() => heading('Curriculum'), 'curriculum page');

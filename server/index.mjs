@@ -34,12 +34,9 @@ const assets = new Map([
   ...[
     'jetbrains-mono-latin-wght-normal.woff2',
     'jetbrains-mono-latin-wght-italic.woff2',
-    'source-sans-3-latin-wght-normal.woff2',
-    'source-sans-3-latin-wght-italic.woff2',
-    'cmu-serif-bold.ttf',
   ].map((name) => [
     `/fonts/${name}`,
-    [`web/fonts/${name}`, name.endsWith('.ttf') ? 'font/ttf' : 'font/woff2'],
+    [`web/fonts/${name}`, 'font/woff2'],
   ]),
   [
     '/vendor/marked.js',

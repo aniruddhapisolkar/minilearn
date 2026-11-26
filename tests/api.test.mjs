@@ -97,13 +97,11 @@ test('complete API workflow: model setup, curriculum proposal, tutor, map, expor
   for (const asset of [
     '/',
     '/app.js',
+    '/styles.css',
     '/workspace.css',
     '/vendor/katex.css',
     '/fonts/jetbrains-mono-latin-wght-normal.woff2',
     '/fonts/jetbrains-mono-latin-wght-italic.woff2',
-    '/fonts/source-sans-3-latin-wght-normal.woff2',
-    '/fonts/source-sans-3-latin-wght-italic.woff2',
-    '/fonts/cmu-serif-bold.ttf',
   ]) {
     const response = await fetch(base + asset);
     assert.equal(response.status, 200);
@@ -112,6 +110,13 @@ test('complete API workflow: model setup, curriculum proposal, tutor, map, expor
     assert.ok(bytes.byteLength > 0);
     if (asset.startsWith('/fonts/'))
       assert.match(response.headers.get('content-type'), /^font\//);
+  }
+  for (const retiredFont of [
+    '/fonts/source-sans-3-latin-wght-normal.woff2',
+    '/fonts/source-sans-3-latin-wght-italic.woff2',
+    '/fonts/cmu-serif-bold.ttf',
+  ]) {
+    assert.equal((await fetch(base + retiredFont)).status, 404);
   }
   const call = async (url, method = 'GET', data, status = 200) => {
     const result = await fetch(base + url, {
