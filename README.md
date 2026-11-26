@@ -29,7 +29,20 @@ Open **http://127.0.0.1:3210** in your browser. The server listens on your compu
 
 ## Data belongs to you
 
-Projects are local, human-readable folders under `~/.minilearn/projects/` by default. Set `MINILEARN_DATA_DIR` to use a different directory; set `PORT` to change the local server port.
+By default, minilearn is fully portable: its code, installed dependencies, npm cache and logs, model credentials, and learning data stay under the application directory. Run `npm ci` and `npm start` from the installation directory. Set `MINILEARN_DATA_DIR` only if you deliberately want a different data location; set `PORT` to change the local server port.
+
+```text
+minilearn/
+├── server/             # application server
+├── web/                # browser interface
+├── node_modules/       # installed dependencies
+└── data/
+    ├── .npm-cache/     # local npm cache and logs
+    ├── settings.json   # model credentials and settings
+    └── projects/      # independent learning projects
+```
+
+Each project is a local, human-readable directory:
 
 ```text
 projects/<project-id>/
@@ -42,6 +55,10 @@ projects/<project-id>/
 ```
 
 The application itself is shared, but no project depends on another project's data. The server sends only your current project's relevant context and explicitly selected source files to the configured model. Model keys are stored in the installation's local `settings.json`, outside every project, and never included in an export. Remove a connection to remove its stored key.
+
+To uninstall, stop the server and delete the entire minilearn folder. This removes all files managed by this installation, including project caches and locally stored credentials. Node.js itself, browser history or caches from earlier versions, shell history, manually exported `.learn` files, and data retained by AI providers remain outside that folder.
+
+**Migrating from the previous storage layout:** Older minilearn installs used `~/.minilearn/`. That directory is never moved or deleted automatically. Stop the server, check that the new `data/` folder has no learning projects or settings, then copy the old `projects/` and `settings.json` (if present) into the new `data/` folder without overwriting existing data. Restart and verify your projects and model connections before removing the old folder. Alternatively, set `MINILEARN_DATA_DIR` to the original directory to keep using it.
 
 Export a full project, or select just the categories you want to share. A `.learn` file is a versioned JSON container with embedded project files; it contains no executable application or external file references and can be imported as a new independent project. The current version supports projects up to 100 MB of data per export/import and individual uploads up to 20 MB.
 

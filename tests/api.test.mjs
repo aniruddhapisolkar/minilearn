@@ -89,6 +89,12 @@ test('complete API workflow: model setup, curriculum proposal, tutor, map, expor
     await close(fake);
     fs.rmSync(dir, { recursive: true, force: true });
   });
+  for (const asset of ['/', '/app.js', '/vendor/katex.css']) {
+    const response = await fetch(base + asset);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('cache-control'), 'no-store');
+    await response.arrayBuffer();
+  }
   const call = async (url, method = 'GET', data, status = 200) => {
     const result = await fetch(base + url, {
       method,

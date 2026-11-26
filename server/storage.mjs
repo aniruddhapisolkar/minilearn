@@ -1,11 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 
 export const VERSION = 1;
+// Anchor portable data to the installed application, not the caller's cwd.
+export const DEFAULT_DATA_ROOT = fileURLToPath(
+  new URL('../data/', import.meta.url),
+);
 export const DATA_ROOT = path.resolve(
-  process.env.MINILEARN_DATA_DIR || path.join(os.homedir(), '.minilearn'),
+  process.env.MINILEARN_DATA_DIR || DEFAULT_DATA_ROOT,
 );
 export const CATEGORIES = ['content', 'generated', 'history', 'cache'];
 const MAX_ARCHIVE = 100 * 1024 * 1024;

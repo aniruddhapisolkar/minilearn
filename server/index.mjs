@@ -1,8 +1,16 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { AppError, CATEGORIES, Storage, parseOutline } from './storage.mjs';
+import {
+  AppError,
+  CATEGORIES,
+  DATA_ROOT,
+  DEFAULT_DATA_ROOT,
+  Storage,
+  parseOutline,
+} from './storage.mjs';
 import {
   activateConnection,
   connect,
@@ -137,9 +145,7 @@ function streamAsset(url, res) {
     );
   res.writeHead(200, {
     'content-type': item[1],
-    'cache-control': url.startsWith('/vendor/')
-      ? 'public, max-age=86400'
-      : 'no-cache',
+    'cache-control': 'no-store',
   });
   fs.createReadStream(file).pipe(res);
 }
@@ -365,10 +371,25 @@ if (
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
     console.error('PORT must be between 1 and 65535.');
     process.exitCode = 1;
-  } else
+  } else {
+    const legacy = path.join(os.homedir(), '.minilearn');
+    const portableProjects = path.join(DEFAULT_DATA_ROOT, 'projects');
+    if (
+      !process.env.MINILEARN_DATA_DIR &&
+      (fs.existsSync(path.join(legacy, 'settings.json')) ||
+        fs.existsSync(path.join(legacy, 'projects'))) &&
+      !fs.existsSync(path.join(DEFAULT_DATA_ROOT, 'settings.json')) &&
+      (!fs.existsSync(portableProjects) ||
+        fs.readdirSync(portableProjects).length === 0)
+    ) {
+      console.log(
+        `Previous minilearn data remains at ${legacy}. See the README to migrate it safely into this installation.`,
+      );
+    }
     createApp().listen(port, '127.0.0.1', () =>
       console.log(
-        `\n  minilearn  http://127.0.0.1:${port}\n  Your learning, at your pace.\n`,
+        `\n  minilearn  http://127.0.0.1:${port}\n  Data: ${DATA_ROOT}\n  Your learning, at your pace.\n`,
       ),
     );
+  }
 }

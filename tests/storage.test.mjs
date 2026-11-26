@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import {
   Storage,
   normalizeCurriculum,
@@ -15,6 +17,27 @@ function fixture(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   return new Storage(root);
 }
+
+test('default data directory is contained in the installation, independently of the working directory', (t) => {
+  const cwd = fs.mkdtempSync(path.join(os.tmpdir(), 'minilearn-cwd-'));
+  t.after(() => fs.rmSync(cwd, { recursive: true, force: true }));
+  const { MINILEARN_DATA_DIR: _override, ...env } = process.env;
+  const source = `import { DATA_ROOT } from ${JSON.stringify(new URL('../server/storage.mjs', import.meta.url).href)}; process.stdout.write(DATA_ROOT);`;
+  const resolveRoot = (environment) =>
+    execFileSync(process.execPath, ['--input-type=module', '-e', source], {
+      cwd,
+      env: environment,
+      encoding: 'utf8',
+    });
+  assert.equal(
+    resolveRoot(env),
+    path.resolve(fileURLToPath(new URL('../data/', import.meta.url))),
+  );
+  assert.equal(
+    resolveRoot({ ...env, MINILEARN_DATA_DIR: path.join(cwd, 'custom') }),
+    path.join(cwd, 'custom'),
+  );
+});
 
 test('outline parsing and stable curriculum identities when moving lessons', (t) => {
   const s = fixture(t),
