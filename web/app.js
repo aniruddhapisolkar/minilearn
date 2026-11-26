@@ -18,6 +18,12 @@ const e = (value) =>
 const icons = {
   book: '<path d="M12 6c-3-2-6-2-9-1v13c3-1 6-1 9 1 3-2 6-2 9-1V5c-3-1-6-1-9 1v13"/>',
   folder: '<path d="M3 7V5a2 2 0 0 1 2-2h4l3 3h7a2 2 0 0 1 2 2v11H3Z"/>',
+  folderPlus:
+    '<path d="M3 7V5a2 2 0 0 1 2-2h4l3 3h7a2 2 0 0 1 2 2v11H3Z M12 10v6M9 13h6"/>',
+  dumbbell:
+    '<path d="m6.5 6.5 11 11M3 8l5-5 4 4-5 5Zm9 9 5-5 4 4-5 5ZM2 6l4-4M18 22l4-4"/>',
+  enter: '<path d="M20 4v7a5 5 0 0 1-5 5H4m5-5-5 5 5 5"/>',
+  key: '<circle cx="8" cy="15" r="4"/><path d="m11 12 9-9m-4 4 3 3m-6 0 3 3"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   settings:
     '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.9 1.9-.06-.06A1.7 1.7 0 0 0 15.96 18a1.7 1.7 0 0 0-1.05 1.55v.09h-2.7v-.09A1.7 1.7 0 0 0 11.16 18a1.7 1.7 0 0 0-1.88.34l-.06.06-1.9-1.9.06-.06A1.7 1.7 0 0 0 7.72 14.56a1.7 1.7 0 0 0-1.55-1.05h-.09v-2.7h.09a1.7 1.7 0 0 0 1.55-1.05 1.7 1.7 0 0 0-.34-1.88l-.06-.06 1.9-1.9.06.06a1.7 1.7 0 0 0 1.88.34 1.7 1.7 0 0 0 1.05-1.55V4.7h2.7v.09a1.7 1.7 0 0 0 1.05 1.55 1.7 1.7 0 0 0 1.88-.34l.06-.06 1.9 1.9-.06.06A1.7 1.7 0 0 0 19.4 9.76a1.7 1.7 0 0 0 1.55 1.05h.09v2.7h-.09A1.7 1.7 0 0 0 19.4 15Z" transform="translate(-1.5 -.2)"/>',
@@ -27,7 +33,7 @@ const icons = {
   up: '<path d="m6 15 6-6 6 6"/>',
   file: '<path d="M6 3h8l4 4v14H6Z M14 3v5h4M9 12h6M9 16h6"/>',
   graph:
-    '<circle cx="5" cy="6" r="2.5"/><circle cx="17" cy="5" r="2.5"/><circle cx="12" cy="18" r="2.5"/><path d="m7.3 7.2 3.4 8.5m4.8-8.6-2.6 8.5m-5.4-9.8 7-.6"/>',
+    '<circle cx="3.5" cy="12" r="2.5"/><circle cx="12" cy="3.5" r="2.5"/><circle cx="20.5" cy="12" r="2.5"/><circle cx="12" cy="20.5" r="2.5"/><path d="m5.3 10.2 4.9-4.9M6 12h12m-7.8 6.7 8.5-4.9"/>',
   data: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 4 16 4 16 0V5M4 12v7c0 4 16 4 16 0v-7"/>',
   panel: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>',
   edit: '<path d="m4 16 11-11 4 4L8 20H4Zm9-9 4 4M15 5l2-2 4 4-2 2"/>',
@@ -76,17 +82,26 @@ const button = (
 const ib = (i, action, label, data = {}, extra = '') =>
   `<button type="button" class="icon-button ${extra}" data-action="${action}" aria-label="${e(label)}" title="${e(label)}"${attrs(data)}>${icon(i)}</button>`;
 const brand = () =>
-  `<button class="brand" data-action="library" title="Projects"><span class="wordmark">minilearn</span></button>`;
+  `<button class="brand" data-action="home" title="Home"><span class="wordmark">minilearn</span></button>`;
 const state = {
   projects: [],
   project: null,
-  view: 'library',
+  view: 'overview',
   lessonId: null,
   mode: 'learn',
   session: null,
   connections: { connections: [], activeConnection: null },
   collapsed: window.innerWidth < 680,
   folded: new Set(),
+  sidebarQuery: '',
+  sessionFilter: 'learn',
+  homeDraft: '',
+  homeMode: 'learn',
+  planVisible: false,
+  answerChoice: '',
+  confidence: 50,
+  practiceNodes: [],
+  attachUpload: false,
   busy: null,
   draft: '',
   plannerDraft: '',
@@ -268,7 +283,7 @@ function errorMessage(error) {
 }
 function modelPill() {
   const c = activeModel();
-  return `<button class="model-pill" data-action="models" title="${c ? e(c.model) : 'Connect a model'}"><span class="dot ${c ? '' : 'off'}"></span><span class="truncate">${c ? e(c.model) : 'Connect model'}</span>${icon('down')}</button>`;
+  return `<div class="model-control"><button class="model-pill" data-action="model-picker" title="${c ? e(c.model) : 'Select a model'}" aria-label="Select model"><span class="truncate">${c ? e(c.model) : '—'}</span><span class="model-caret">▾</span></button></div>`;
 }
 function empty(iconName, title, body, actions = '') {
   return `<div class="empty"><div class="empty-icon">${icon(iconName)}</div><h2>${e(title)}</h2><p>${e(body)}</p>${actions ? `<div class="row wrap" style="justify-content:center">${actions}</div>` : ''}</div>`;
@@ -282,6 +297,11 @@ function closeDialog() {
 function showDialog(title, body, footer = '', wide = false) {
   dialog.className = wide ? 'wide-dialog' : '';
   dialog.innerHTML = `<div class="dialog-head"><h2 id="dialog-title">${e(title)}</h2>${ib('close', 'close-dialog', 'Close')}</div><div class="dialog-body">${body}</div>${footer ? `<div class="dialog-footer">${footer}</div>` : ''}`;
+  if (!dialog.open) dialog.showModal();
+}
+function showSettings(body) {
+  dialog.className = 'settings-dialog';
+  dialog.innerHTML = `<div class="settings-heading"><h2 id="dialog-title">Settings</h2>${ib('close', 'close-dialog', 'Close settings')}</div><div class="settings-layout"><nav class="settings-rail" aria-label="Settings sections"><button class="settings-nav active" data-action="models">${icon('key')} Providers</button>${state.project ? `<button class="settings-nav" data-action="settings-data">${icon('data')} Data &amp; export</button>` : ''}</nav><section class="settings-content">${body}</section></div>`;
   if (!dialog.open) dialog.showModal();
 }
 function formDialog(
@@ -334,8 +354,12 @@ function hashLocation() {
     return;
   }
   const pieces = [state.project.id, state.view];
-  if (state.view === 'lesson' && state.lessonId)
+  if (state.view === 'lesson' && state.lessonId) {
     pieces.push(state.lessonId, state.mode);
+    if (state.session) pieces.push(state.session.id);
+  } else if (state.view === 'draft') {
+    pieces.push(state.homeMode);
+  }
   history.replaceState(
     null,
     '',
@@ -344,8 +368,13 @@ function hashLocation() {
 }
 function go(view) {
   if (!canNavigate()) return;
+  if (!state.project && !['overview', 'graph', 'draft'].includes(view)) {
+    projectDialog();
+    return;
+  }
   state.view = view;
   state.session = null;
+  state.planVisible = false;
   if (window.innerWidth < 680) state.collapsed = true;
   hashLocation();
   render();
@@ -363,6 +392,9 @@ function applyProject(p) {
   state.selectedMaterials = state.selectedMaterials.filter((id) =>
     p.materials.some((m) => m.id === id),
   );
+  state.practiceNodes = state.practiceNodes.filter((id) =>
+    p.graph.nodes.some((n) => n.id === id),
+  );
 }
 async function refreshProject() {
   applyProject(await api(purl()));
@@ -378,16 +410,25 @@ async function openProject(
   view = 'overview',
   lessonId = null,
   mode = 'learn',
+  sessionId = null,
 ) {
   if (!canNavigate()) return;
   state.project = await api(`/api/projects/${encodeURIComponent(id)}`);
   state.view = view;
   state.lessonId = lessonId;
-  state.mode = mode === 'practice' ? 'practice' : 'learn';
+  state.mode =
+    (view === 'draft' ? lessonId : mode) === 'practice' ? 'practice' : 'learn';
   state.session = null;
   state.draft = '';
+  state.homeDraft = '';
+  state.homeMode = state.mode;
+  state.sessionFilter = state.mode;
+  state.answerChoice = '';
+  state.confidence = 50;
+  state.sidebarQuery = '';
   state.plannerDraft = '';
   state.selectedMaterials = [];
+  state.practiceNodes = [];
   state.folded.clear();
   state.graph = {
     query: '',
@@ -399,6 +440,16 @@ async function openProject(
     y: 0,
     fit: true,
   };
+  if (
+    view === 'lesson' &&
+    sessionId &&
+    state.project.sessions.some(
+      (s) => s.id === sessionId && s.lessonId === lessonId,
+    )
+  ) {
+    await openSession(sessionId);
+    return;
+  }
   if (view === 'lesson' && selectedLesson()) {
     await selectLesson(lessonId, state.mode);
     return;
@@ -406,6 +457,7 @@ async function openProject(
   if (
     ![
       'overview',
+      'draft',
       'curriculum',
       'planner',
       'materials',
@@ -422,9 +474,13 @@ async function selectLesson(id, mode = 'learn') {
   if (!canNavigate()) return;
   state.lessonId = id;
   state.mode = mode;
+  if (state.sessionFilter !== 'all') state.sessionFilter = mode;
   state.view = 'lesson';
   state.session = null;
   state.draft = '';
+  state.answerChoice = '';
+  state.confidence = 50;
+  state.planVisible = false;
   state.selectedMaterials = [];
   const l = selectedLesson();
   if (!l) {
@@ -447,21 +503,76 @@ async function selectLesson(id, mode = 'learn') {
   window.scrollTo(0, 0);
   if (state.session?.messages.length) scrollMessages(false);
 }
-function renderLibrary() {
-  const cards = state.projects
-    .map(
-      (p) =>
-        `<button class="project-card" data-action="open-project" data-id="${e(p.id)}"><span class="card-icon">${icon('folder')}</span><span class="grow"><h2>${e(p.name)}</h2><span class="project-meta">${p.lessonCount} ${p.lessonCount === 1 ? 'lesson' : 'lessons'} · Updated ${e(dateLabel(p.updatedAt))}</span></span>${icon('right')}</button>`,
-    )
+function sessionRows() {
+  const p = state.project,
+    q = state.sidebarQuery.trim().toLowerCase();
+  if (!p)
+    return `<div class="session-empty">${state.projects.length ? 'Choose a project.' : 'No sessions yet.'}</div>`;
+  const matches = (value) => !q || String(value).toLowerCase().includes(q);
+  const row = (l, s = null) => {
+    const mode =
+      s?.mode || (state.sessionFilter === 'practice' ? 'practice' : 'learn');
+    const active =
+      state.view === 'lesson' &&
+      state.lessonId === l.id &&
+      (s ? state.session?.id === s.id : !state.session);
+    const meta = s
+      ? `${state.sessionFilter === 'all' ? (mode === 'learn' ? 'Teaching' : 'Practice') + ' · ' : ''}${dateLabel(s.updatedAt)}`
+      : statusLabel(p.progress[l.id]);
+    return `<button class="session-row lesson-link ${active ? 'active' : ''}" data-action="${s ? 'open-session' : 'lesson'}" data-id="${e(s?.id || l.id)}" data-lesson="${e(l.id)}" data-mode="${mode}"><span class="session-name">${e(l.title)}</span><span class="session-subtitle">${e(meta)}</span></button>`;
+  };
+  let count = 0;
+  const modules = p.curriculum
+    .map((m) => {
+      const rows = m.lessons.flatMap((l) => {
+        if (!matches(l.title) && !matches(m.title)) return [];
+        const sessions = p.sessions.filter(
+          (s) =>
+            s.lessonId === l.id &&
+            (state.sessionFilter === 'all' || s.mode === state.sessionFilter),
+        );
+        const items = sessions.length
+          ? sessions.map((s) => row(l, s))
+          : [row(l)];
+        count += items.length;
+        return items;
+      });
+      if (q && !rows.length && !matches(m.title)) return '';
+      const folded = state.folded.has(m.id) && !q;
+      return `<div class="session-folder"><button class="session-folder-row" data-action="fold-module" data-id="${e(m.id)}" aria-expanded="${!folded}">${icon(folded ? 'right' : 'down')}${icon('folder')}<span class="grow">${e(m.title)}</span></button>${folded ? '' : `<div class="session-folder-children">${rows.join('')}</div>`}</div>`;
+    })
     .join('');
-  return `<header class="library-header">${brand()}<div class="row">${modelPill()}${ib('settings', 'models', 'Model settings')}</div></header><main class="library"><div class="library-hero"><h1>What are you learning?</h1></div><div class="section-heading between wrap"><span class="caps">Projects · ${state.projects.length}</span><div class="row wrap">${button('New project', 'new-project', { style: 'primary', i: 'plus' })}${button('Import .learn', 'import', { i: 'import' })}</div></div><div class="project-grid">${cards || '<p class="muted library-empty">No projects yet.</p>'}</div></main>`;
-}
-function nav(label, key, i) {
-  return `<button class="nav-link ${state.view === key ? 'active' : ''}" data-action="go" data-view="${key}">${icon(i)}${label}</button>`;
+  const archived = p.sessions.filter(
+    (s) =>
+      !lessons().some((l) => l.id === s.lessonId) &&
+      (state.sessionFilter === 'all' || s.mode === state.sessionFilter) &&
+      matches(s.lessonTitle),
+  );
+  const archivedRows = archived.length
+    ? `<div class="session-folder"><div class="session-folder-row">${icon('folder')} Archived sessions</div>${archived.map((s) => `<button class="session-row lesson-link" data-action="view-session" data-id="${e(s.id)}"><span class="session-name">${e(s.lessonTitle)}</span><span class="session-subtitle">${e(dateLabel(s.updatedAt))}</span></button>`).join('')}</div>`
+    : '';
+  return (
+    modules +
+    archivedRows +
+    (!count && !archived.length
+      ? `<div class="session-empty">${q ? 'No sessions match.' : 'No sessions yet.'}</div>`
+      : '')
+  );
 }
 function renderSidebar() {
   const p = state.project;
-  return `<aside class="sidebar"><div class="side-top between">${brand()}${ib('panel', 'toggle-sidebar', 'Collapse sidebar')}</div><div class="side-project"><button class="project-back" data-action="library">${icon('back')} All projects</button><button class="project-title truncate" data-action="go" data-view="overview" title="${e(p.name)}">${e(p.name)}</button></div><div class="side-curriculum"><div class="side-heading between"><span class="caps">Curriculum</span>${ib('edit', 'go', 'Edit curriculum', { 'data-view': 'curriculum' })}</div>${p.curriculum.length ? p.curriculum.map((m) => `<div class="side-module"><button class="module-trigger" data-action="fold-module" data-id="${e(m.id)}" aria-expanded="${!state.folded.has(m.id)}">${icon(state.folded.has(m.id) ? 'right' : 'down')}<span class="grow">${e(m.title)}</span></button>${state.folded.has(m.id) ? '' : m.lessons.map((l) => `<button class="lesson-link ${state.view === 'lesson' && state.lessonId === l.id ? 'active' : ''}" data-action="lesson" data-id="${e(l.id)}">${statusDot(p.progress[l.id])}<span>${e(l.title)}</span></button>`).join('')}</div>`).join('') : `<button class="add-inline" data-action="go" data-view="curriculum">${icon('plus')} Add your curriculum</button>`}</div><nav class="side-nav">${nav('Curriculum editor', 'curriculum', 'book')}${nav('Study materials', 'materials', 'file')}${nav('Knowledge map', 'graph', 'graph')}${nav('Data & export', 'data', 'data')}</nav></aside>`;
+  return `<aside class="sidebar"><div class="side-top between">${brand()}${ib('panel', 'toggle-sidebar', 'Collapse sidebar')}</div><div class="sidebar-doors"><button class="sidebar-door" data-action="draft" data-mode="learn">${icon('plus')} Teaching</button><button class="sidebar-door" data-action="draft" data-mode="practice">${icon('dumbbell')} Practice</button></div><div class="workspace-picker"><button class="workspace-project" data-action="projects">${icon('folder')}<span class="grow truncate">${e(p?.name || 'Projects')}</span>${icon('down')}</button>${ib('folderPlus', 'new-project', 'New project')}</div><div class="session-search-row"><span class="caps">Sessions</span><div class="session-search-box">${icon('search')}<input id="session-search" aria-label="Search sessions" placeholder="Search…" value="${e(state.sidebarQuery)}"></div>${p ? ib('folderPlus', 'add-module', 'Add module') : ib('folderPlus', 'new-project', 'Add project')}</div><div class="session-filter" role="group" aria-label="Filter sessions">${[
+    ['learn', 'Teaching'],
+    ['practice', 'Practice'],
+    ['all', 'All'],
+  ]
+    .map(
+      ([mode, label]) =>
+        `<button class="${state.sessionFilter === mode ? 'active' : ''}" data-action="session-filter" data-mode="${mode}">${label}</button>`,
+    )
+    .join(
+      '',
+    )}</div><div class="session-list" id="sidebar-rows">${sessionRows()}</div><div class="sidebar-footer">${p ? `<div class="project-tools"><span class="caps">Project</span><div class="row">${ib('graph', 'go', 'Knowledge graph', { 'data-view': 'graph' })}${ib('book', 'go', 'Curriculum', { 'data-view': 'curriculum' })}${ib('file', 'go', 'Study materials', { 'data-view': 'materials' })}${ib('data', 'go', 'Data & export', { 'data-view': 'data' })}</div></div>` : ''}<button class="sidebar-door sidebar-settings" data-action="models">${icon('settings')} Settings</button></div></aside>`;
 }
 function topbar() {
   const title =
@@ -475,7 +586,7 @@ function topbar() {
           graph: 'Knowledge map',
           data: 'Data & export',
         }[state.view];
-  return `<header class="topbar">${state.collapsed ? ib('panel', 'toggle-sidebar', 'Open sidebar') : ''}<h1 class="window-title grow truncate" title="${e(title || '')}">${e(title || '')}</h1>${modelPill()}${ib('settings', 'models', 'Model settings')}</header>`;
+  return `<header class="topbar">${state.collapsed ? ib('panel', 'toggle-sidebar', 'Open sidebar') : ''}<h1 class="window-title grow truncate" title="${e(title || '')}">${e(title || '')}</h1>${state.view === 'lesson' ? `<button class="plan-toggle ${state.planVisible ? 'active' : ''}" data-action="toggle-plan">${icon('graph')} Plan</button><span class="mode-indicator"><span class="mode-ring"></span>${state.mode === 'learn' ? 'Teaching' : 'Practice'}</span>${ib('more', 'session-options', 'Session options')}` : ib('close', 'go', 'Back to knowledge graph', { 'data-view': 'overview' })}</header>`;
 }
 function renderOverview() {
   const p = state.project,
@@ -484,14 +595,44 @@ function renderOverview() {
     next = all.find((l) => p.progress[l.id] !== 'complete') || all[0];
   return `<main class="page narrow"><div class="page-head"><span class="caps">Learning project</span><h1 style="margin-top:9px">${e(p.name)}</h1><p>${all.length ? 'Your curriculum, materials, and learning history.' : 'Build the curriculum the way you want to learn it.'}</p></div>${all.length ? `<div class="overview-progress"><div class="progress-track" aria-label="${complete} of ${all.length} lessons complete"><div style="width:${(complete / all.length) * 100}%"></div></div><span class="small muted">${complete} / ${all.length} complete</span></div><div class="row wrap">${next ? button('Continue learning', 'lesson', { style: 'primary', i: 'arrow', data: { 'data-id': next.id } }) : ''}${button('Edit curriculum', 'go', { i: 'edit', data: { 'data-view': 'curriculum' } })}</div><div class="section"><div class="section-heading between"><h2>Curriculum</h2>${button('Plan with AI', 'go', { style: 'ghost', i: 'spark', data: { 'data-view': 'planner' } })}</div>${p.curriculum.map((m) => `<div class="overview-module"><h3>${e(m.title)}</h3>${m.lessons.length ? m.lessons.map((l) => `<button class="overview-lesson" data-action="lesson" data-id="${e(l.id)}">${statusDot(p.progress[l.id])}<span class="grow">${e(l.title)}</span>${icon('right')}</button>`).join('') : '<span class="small muted">No lessons yet.</span>'}</div>`).join('')}</div>` : empty('book', 'Make a plan', 'Paste a syllabus, talk through a plan with AI, or start with an empty module.', button('Build curriculum', 'go', { style: 'primary', i: 'plus', data: { 'data-view': 'curriculum' } }) + button('Plan with AI', 'go', { i: 'spark', data: { 'data-view': 'planner' } }))}</main>`;
 }
+function modeSwitch(mode, action = 'home-mode') {
+  return `<div class="dock-mode-switch" role="group" aria-label="Learning mode"><button class="${mode === 'learn' ? 'active' : ''}" data-action="${action}" data-mode="learn">Teach</button><button class="${mode === 'practice' ? 'active' : ''}" data-action="${action}" data-mode="practice">${icon('dumbbell')} Practice</button></div>`;
+}
+function dockSetup() {
+  return activeModel()
+    ? ''
+    : button('Add a provider key', 'add-model', { style: 'setup-key' });
+}
+function homeDock(switchMode = true) {
+  const practice = state.homeMode === 'practice';
+  const pick =
+    practice && state.project
+      ? button(
+          state.practiceNodes.length
+            ? `${state.practiceNodes.length} nodes`
+            : 'Pick nodes',
+          'practice-nodes',
+          { style: 'pick-nodes', i: 'dumbbell' },
+        )
+      : '';
+  return `<div class="home-dock"><div class="dock-inner"><div class="dock-actions">${pick}${dockSetup()}</div><form id="home-form" class="opening-composer" data-drop-composer><textarea name="topic" aria-label="${practice ? 'What do you want to practice?' : 'What do you want to learn?'}" placeholder="${practice ? 'What do you want to practice?' : 'What do you want to learn?'}" rows="1">${e(state.homeDraft)}</textarea>${ib('paperclip', 'choose-materials', 'Attach files', {}, 'composer-attach')}<button type="submit" class="send-square" aria-label="Start session" ${!state.homeDraft.trim() && !state.practiceNodes.length ? 'disabled' : ''}>${icon('enter')}</button></form><div class="dock-stats">${switchMode ? modeSwitch(state.homeMode) : ''}<span class="spacer"></span>${state.selectedMaterials.length ? `<span class="dock-source-count">${state.selectedMaterials.length} sources</span>` : ''}${modelPill()}</div></div></div>`;
+}
+const emptyGraphProject = { curriculum: [], graph: { nodes: [], edges: [] } };
+function renderHome() {
+  const p = state.project || emptyGraphProject;
+  return `<main class="home-workspace">${state.collapsed ? `<div class="floating-sidebar-toggle">${ib('panel', 'toggle-sidebar', 'Open sidebar')}</div>` : ''}${graphMarkup(p, state.graph, { e, icon, button, ib, pageHeader })}${homeDock()}</main>`;
+}
+function renderDraft() {
+  return `<main class="draft-workspace">${state.collapsed ? `<div class="floating-sidebar-toggle">${ib('panel', 'toggle-sidebar', 'Open sidebar')}</div>` : ''}<div class="draft-empty"><h2>${state.homeMode === 'practice' ? 'New practice session' : 'New session'}</h2><p>${state.homeMode === 'practice' ? 'Pick nodes from your knowledge graph, describe what you want to practice, or bring your own problem.' : 'The teacher will open by probing what you already know.'}</p></div>${homeDock(false)}</main>`;
+}
 function renderCurriculum() {
   const p = state.project;
   return `<main class="page"><div class="page-head"><h1>Curriculum</h1><p>Your plan is always yours to edit. Add, move, or refine any lesson.</p><div class="row wrap" style="margin-top:18px">${button('Add module', 'add-module', { style: 'primary', i: 'plus' })}${button('Paste outline', 'paste-outline', { i: 'file' })}${button('Plan with AI', 'go', { i: 'spark', data: { 'data-view': 'planner' } })}</div></div>${p.curriculum.length ? p.curriculum.map((m, i) => `<section class="module-card"><div class="module-card-header"><span class="module-number">${String(i + 1).padStart(2, '0')}</span><div class="grow"><h3>${e(m.title)}</h3>${m.description ? `<div class="module-desc">${e(m.description)}</div>` : ''}</div><div class="controls">${i > 0 ? ib('up', 'move-module', 'Move module up', { 'data-id': m.id, 'data-direction': '-1' }) : ''}${i < p.curriculum.length - 1 ? ib('down', 'move-module', 'Move module down', { 'data-id': m.id, 'data-direction': '1' }) : ''}${ib('edit', 'edit-module', 'Edit module', { 'data-id': m.id })}${ib('trash', 'delete-module', 'Delete module', { 'data-id': m.id }, 'danger')}</div></div><div class="module-lessons">${m.lessons.map((l, j) => `<div class="edit-lesson">${statusDot(p.progress[l.id])}<div class="grow"><div class="title">${e(l.title)}</div>${l.description ? `<small>${e(l.description)}</small>` : ''}</div><div class="controls">${ib('plus', 'add-lesson', 'Insert lesson after this one', { 'data-module': m.id, 'data-after': l.id })}${j > 0 ? ib('up', 'move-lesson', 'Move lesson up', { 'data-module': m.id, 'data-id': l.id, 'data-direction': '-1' }) : ''}${j < m.lessons.length - 1 ? ib('down', 'move-lesson', 'Move lesson down', { 'data-module': m.id, 'data-id': l.id, 'data-direction': '1' }) : ''}${ib('edit', 'edit-lesson', 'Edit or move lesson', { 'data-module': m.id, 'data-id': l.id })}${ib('trash', 'delete-lesson', 'Delete lesson', { 'data-module': m.id, 'data-id': l.id }, 'danger')}</div></div>`).join('')}<button class="add-inline" data-action="add-lesson" data-module="${e(m.id)}">${icon('plus')} Add lesson</button></div></section>`).join('') : empty('book', 'Start from scratch', 'You can build the outline manually or turn your own text into a curriculum.', button('Add module', 'add-module', { style: 'primary', i: 'plus' }) + button('Paste outline', 'paste-outline', { i: 'file' }))}</main>`;
 }
-function messageHTML(m, { save = false } = {}) {
+function messageHTML(m, { save = false, showQuestion = true } = {}) {
   return m.role === 'user'
     ? `<article class="message user"><div class="user-bubble">${e(m.content)}</div></article>`
-    : `<article class="message assistant"><div class="markdown">${markdown(m.content)}</div>${save ? `<div class="message-actions">${button('Save as study note', 'save-message', { i: 'note', style: 'minor', data: { 'data-id': m.id } })}${ib('trash', 'delete-exchange', 'Delete this exchange', { 'data-id': m.id }, 'danger')}</div>` : ''}</article>`;
+    : `<article class="message assistant">${m.content ? `<div class="markdown">${markdown(m.content)}</div>` : ''}${showQuestion && m.question ? `<div class="past-question"><span class="caps">${e(questionLabel(m.question.kind))}</span><div class="markdown">${markdown(m.question.prompt)}</div>${m.question.options.length ? `<ol class="past-options">${m.question.options.map((option) => `<li>${markdown(option)}</li>`).join('')}</ol>` : ''}</div>` : ''}${save ? `<div class="message-actions">${m.content ? button('Save as study note', 'save-message', { i: 'note', style: 'minor', data: { 'data-id': m.id } }) : ''}${ib('trash', 'delete-exchange', 'Delete this exchange', { 'data-id': m.id }, 'danger')}</div>` : ''}</article>`;
 }
 function proposalList(curriculum) {
   return `<ul class="proposal-list">${curriculum.map((m) => `<li><strong>${e(m.title)}</strong><ol>${m.lessons.map((l) => `<li>${e(l.title)}</li>`).join('')}</ol></li>`).join('')}</ul>`;
@@ -555,17 +696,41 @@ function renderPlanner() {
     working = state.busy?.kind === 'planner';
   return `<main class="page wide"><div class="page-head"><h1>Plan with AI</h1><p>Talk through your curriculum. Nothing changes until you apply a proposal.</p><div class="row wrap" style="margin-top:14px">${button('Back to editor', 'go', { i: 'back', data: { 'data-view': 'curriculum' } })}${planner.messages.length ? button('Clear conversation', 'clear-planner', { style: 'ghost', i: 'trash' }) : ''}</div></div><div class="planner-grid"><div><div class="planner-messages">${planner.messages.length ? planner.messages.map((m) => messageHTML(m)).join('') : `<div class="card"><h3>What would you like to learn?</h3><p class="muted">Paste a full syllabus, describe a subject and your goals, or ask for a specific change — for example, “Add spectral decomposition after eigenvectors in Module 5.”</p></div>`}${working ? `<div class="thinking"><span class="spinner"></span>Working on your curriculum…</div>` : ''}</div><form id="planner-form" class="planner-composer"><textarea name="message" aria-label="Message to curriculum planner" placeholder="Describe your curriculum or a change…" ${working ? 'disabled' : ''}>${e(state.plannerDraft)}</textarea><div class="row" style="justify-content:flex-end">${working ? button('Stop', 'stop', { i: 'stop' }) : `${button('Paste outline', 'paste-outline', { style: 'ghost', i: 'file' })}<button class="button primary" type="submit">${icon('send')} Send</button>`}</div></form></div><aside class="card planner-preview"><div class="between"><h3>${planner.proposal ? 'Proposed curriculum' : 'Current curriculum'}</h3><span class="tag ${planner.proposal ? 'complete' : ''}">${planner.proposal ? 'Review' : 'Saved'}</span></div>${planner.proposal ? proposalChanges(planner.proposal, state.project.curriculum) : ''}${(planner.proposal || state.project.curriculum).length ? proposalList(planner.proposal || state.project.curriculum) : '<p class="small muted">Your curriculum is empty.</p>'}${planner.proposal ? `<div class="notice small">Review the full outline before applying. Your existing lesson sessions and progress follow their stable IDs.</div><div class="row wrap" style="margin-top:12px">${button('Apply proposal', 'apply-proposal', { style: 'primary', i: 'check' })}${button('Discard', 'discard-proposal', { style: 'ghost' })}</div>` : ''}</aside></div></main>`;
 }
+const questionLabel = (kind) =>
+  ({
+    prediction: 'Prediction',
+    check: 'Check your understanding',
+    practice: 'Practice',
+  })[kind] || 'Question';
+function activeQuestion() {
+  const message = state.session?.messages.at(-1);
+  return message?.role === 'assistant' ? message.question : null;
+}
+function renderPlanPanel() {
+  if (!state.planVisible) return '';
+  const lesson = selectedLesson(),
+    module = state.project.curriculum.find((m) => m.id === lesson?.moduleId);
+  if (!module) return '';
+  return `<aside class="session-plan"><div class="between"><span class="caps">${e(module.title)}</span>${ib('close', 'toggle-plan', 'Close plan')}</div><div class="plan-nodes">${module.lessons.map((l, i) => `${i ? '<span class="plan-arrow">↓</span>' : ''}<button class="plan-node ${l.id === lesson.id ? 'active' : ''}" data-action="lesson" data-id="${e(l.id)}" data-mode="${state.mode}">${e(l.title)}</button>`).join('')}</div></aside>`;
+}
+function answerDock(working) {
+  const question = activeQuestion();
+  const footer = `<div class="dock-stats"><span class="dock-source-count">${state.selectedMaterials.length ? `${state.selectedMaterials.length} sources` : ''}</span><span class="spacer"></span>${modelPill()}</div>`;
+  if (!question)
+    return `<div class="session-dock"><div class="dock-inner"><div class="dock-actions">${dockSetup()}</div><form id="lesson-form" class="opening-composer" data-drop-composer><textarea name="message" id="lesson-message" aria-label="Your message" placeholder="${state.session?.messages.length ? 'Ask a question or explain your thinking…' : state.mode === 'learn' ? 'What do you want to learn?' : 'What do you want to practice?'}" rows="1" ${working ? 'disabled' : ''}>${e(state.draft)}</textarea>${ib('paperclip', 'choose-materials', 'Attach files', {}, 'composer-attach')}${working ? `<button type="button" class="send-square stop-square" data-action="stop" aria-label="Stop">${icon('stop')}</button>` : `<button class="send-square" type="submit" aria-label="Submit message" ${!state.draft.trim() ? 'disabled' : ''}>${icon('enter')}</button>`}</form>${footer}</div></div>`;
+  const hasChoices = question.options.length > 0;
+  const options = hasChoices
+    ? `<div class="quiz-options">${question.options.map((option, i) => `<label class="quiz-option ${state.answerChoice === String(i) ? 'selected' : ''}"><input type="radio" name="choice" value="${i}" ${state.answerChoice === String(i) ? 'checked' : ''} ${working ? 'disabled' : ''}><span class="markdown">${markdown(option)}</span></label>`).join('')}<label class="quiz-option unknown ${state.answerChoice === 'unknown' ? 'selected' : ''}"><input type="radio" name="choice" value="unknown" ${state.answerChoice === 'unknown' ? 'checked' : ''} ${working ? 'disabled' : ''}><span>I don't know</span></label></div>`
+    : '';
+  return `<div class="session-dock question-dock-wrap"><div class="dock-inner"><div class="dock-actions">${dockSetup()}</div><form id="lesson-form" class="question-dock" data-drop-composer><section class="question-body"><div class="caps question-kind">${questionLabel(question.kind)}</div><div class="markdown question-prompt">${markdown(question.prompt)}</div>${options}</section><div class="confidence-row"><label class="caps" for="confidence">Confidence</label><input id="confidence" name="confidence" type="range" min="0" max="100" value="${state.confidence}" style="--confidence:${state.confidence}%" ${working ? 'disabled' : ''}><output id="confidence-value">${state.confidence}%</output></div><div class="thinking-wrap"><label class="caps" for="lesson-message">Your thinking</label><textarea id="lesson-message" name="message" aria-label="Your message" placeholder="${hasChoices ? 'Why this answer? Whatever comes to mind.' : 'Work through your answer. Whatever comes to mind.'}" ${working ? 'disabled' : ''}>${e(state.draft)}</textarea><div class="thinking-footer"><span class="small muted">↵ submits · ⇧↵ newline</span><span class="spacer"></span>${ib('paperclip', 'choose-materials', 'Attach files', {}, 'composer-attach')}${working ? button('Stop', 'stop', { i: 'stop', style: 'danger' }) : `<button class="button primary submit-answer" type="submit" ${!state.draft.trim() && !state.answerChoice ? 'disabled' : ''}>Submit answer</button>`}</div></div></form>${footer}</div></div>`;
+}
 function renderLesson() {
   const l = selectedLesson();
   if (!l) return renderOverview();
-  const p = state.project,
-    s = state.session,
-    matching = p.sessions.filter(
-      (v) => v.lessonId === l.id && v.mode === state.mode,
-    ),
+  const s = state.session,
     working = state.busy?.kind === 'session',
-    progress = p.progress[l.id];
-  return `<main class="session-page"><div class="lesson-head"><div class="between wrap lesson-meta"><span class="caps grow">${e(l.moduleTitle)}</span><div class="tabs" role="group" aria-label="Learning mode"><button class="tab ${state.mode === 'learn' ? 'active' : ''}" data-action="mode" data-mode="learn">Teaching</button><button class="tab ${state.mode === 'practice' ? 'active' : ''}" data-action="mode" data-mode="practice">Practice</button></div><button class="button minor ${progress === 'complete' ? '' : 'ghost'}" data-action="progress">${icon(progress === 'complete' ? 'check' : 'flag')} ${progress === 'complete' ? 'Complete' : 'Mark complete'}</button></div>${l.description ? `<p class="muted lesson-description">${e(l.description)}</p>` : ''}</div><div class="session-tools"><div class="row"><select class="session-select" id="session-select" aria-label="Choose a session" ${!matching.length ? 'disabled' : ''}>${!matching.length ? '<option>No sessions yet</option>' : matching.map((v, i) => `<option value="${e(v.id)}" ${s?.id === v.id ? 'selected' : ''}>${i === 0 ? 'Latest session' : `Session ${matching.length - i}`} · ${e(dateLabel(v.updatedAt))}</option>`).join('')}</select>${s ? ib('trash', 'delete-session', 'Delete this session', { 'data-id': s.id }, 'danger') : ''}</div>${button('New session', 'new-session', { i: 'plus', style: 'minor', disabled: Boolean(working) })}</div><div class="lesson-content" id="messages">${s?.messages.length ? s.messages.map((m) => messageHTML(m, { save: true })).join('') : `<div class="lesson-empty"><h2>${state.mode === 'learn' ? 'Start a teaching session' : 'Start a practice session'}</h2>${!working ? button(state.mode === 'learn' ? 'Begin lesson' : 'Begin practice', 'begin-session', { style: 'primary', i: 'arrow' }) : ''}</div>`}${working ? `<div class="thinking"><span class="spinner"></span>Thinking…</div>` : ''}</div><div class="composer-shell"><form id="lesson-form" class="composer"><label class="caps composer-label" for="lesson-message">Your thinking</label><textarea id="lesson-message" name="message" aria-label="Your message" placeholder="${state.mode === 'learn' ? 'Ask a question or explain your thinking…' : 'Work through your answer or ask for a hint…'}" ${working ? 'disabled' : ''}>${e(state.draft)}</textarea><div class="composer-footer">${button(state.selectedMaterials.length ? `${state.selectedMaterials.length} sources` : 'Sources', 'choose-materials', { style: 'ghost minor', i: 'paperclip', disabled: Boolean(working) })}<span class="spacer"></span>${working ? button('Stop', 'stop', { i: 'stop' }) : `<button type="submit" class="button primary">${icon('send')} Submit</button>`}</div></form><div class="composer-caption">Your model may make mistakes. Verify important claims.</div></div></main>`;
+    last = s?.messages.at(-1);
+  return `<main class="session-page"><div class="lesson-content" id="messages">${s?.messages.length ? s.messages.map((m) => messageHTML(m, { save: true, showQuestion: m.id !== last?.id || !activeQuestion() })).join('') : `<div class="lesson-empty"><h2>${state.mode === 'learn' ? 'New session' : 'New practice session'}</h2><p>${l.description ? e(l.description) : state.mode === 'learn' ? 'The teacher will open by probing what you already know.' : 'Describe what you want to practice or bring your own problem.'}</p>${!working ? button(state.mode === 'learn' ? 'Begin lesson' : 'Begin practice', 'begin-session', { style: 'ghost minor', i: 'arrow' }) : ''}</div>`}${working ? `<div class="thinking"><span class="spinner"></span>Thinking…</div>` : ''}</div>${answerDock(working)}${renderPlanPanel()}</main>`;
 }
 function renderMaterials() {
   const p = state.project;
@@ -585,42 +750,46 @@ function renderData() {
     )}</div><div class="section"><h2>Project</h2><div class="card"><div class="between"><div><h3>${e(p.name)}</h3><p class="small muted">Created ${e(dateLabel(p.createdAt))}</p></div>${button('Rename', 'rename-project', { i: 'edit' })}</div><div class="divider"></div><div class="between"><span class="caps">Local folder</span>${button('Copy path', 'copy-folder', { style: 'ghost minor' })}</div><p class="mono" style="overflow-wrap:anywhere;margin:5px 0">${e(p.folder)}</p><p class="small muted">This folder is independent. Move or share a full .learn export to open it elsewhere.</p></div></div><div class="notice">Model credentials are global to your installation, never included in a .learn file. Clearing local caches does not delete data retained independently by your AI provider.</div><div class="danger-zone between"><div><h3>Delete project</h3><p class="small muted">Permanently remove this project and everything inside it.</p></div>${button('Delete project', 'delete-project', { style: 'danger', i: 'trash' })}</div></main>`;
 }
 function render() {
-  if (!state.project) {
-    root.innerHTML = renderLibrary();
-    return;
-  }
+  const viewKey = `${state.project?.id || ''}/${state.view}/${state.lessonId || ''}/${state.session?.id || ''}`;
+  const previousPanel = $('.main-panel');
+  const sameView = previousPanel?.dataset.viewKey === viewKey;
+  const transcriptScroll = sameView ? $('#messages')?.scrollTop : null;
+  const pageScroll = sameView ? $('.main-panel > .page')?.scrollTop : null;
+  const sidebarScroll = $('.session-list')?.scrollTop;
   let content;
-  switch (state.view) {
-    case 'curriculum':
-      content = renderCurriculum();
-      break;
-    case 'planner':
-      content = renderPlanner();
-      break;
-    case 'lesson':
-      content = renderLesson();
-      break;
-    case 'materials':
-      content = renderMaterials();
-      break;
-    case 'graph':
-      content = graphMarkup(state.project, state.graph, {
-        e,
-        icon,
-        button,
-        ib,
-        pageHeader,
-      });
-      break;
-    case 'data':
-      content = renderData();
-      break;
-    default:
-      content = renderOverview();
-  }
-  root.innerHTML = `<div class="app-shell ${state.collapsed ? 'collapsed' : ''}">${renderSidebar()}<div class="main-panel">${topbar()}${content}</div></div>`;
-  if (state.view === 'graph')
-    mountGraph(state.project, state.graph, {
+  const home =
+    (!state.project && state.view !== 'draft') ||
+    ['overview', 'graph', 'library'].includes(state.view);
+  const draft = state.view === 'draft';
+  if (home) content = renderHome();
+  else if (draft) content = renderDraft();
+  else
+    switch (state.view) {
+      case 'curriculum':
+        content = renderCurriculum();
+        break;
+      case 'planner':
+        content = renderPlanner();
+        break;
+      case 'lesson':
+        content = renderLesson();
+        break;
+      case 'materials':
+        content = renderMaterials();
+        break;
+      case 'data':
+        content = renderData();
+        break;
+      default:
+        content = renderHome();
+    }
+  root.innerHTML = `<div class="app-shell ${state.collapsed ? 'collapsed' : ''}">${renderSidebar()}<div class="main-panel ${home || draft ? 'canvas-panel' : ''}">${home || draft ? '' : topbar()}${content}</div></div>`;
+  $('.main-panel').dataset.viewKey = viewKey;
+  if (transcriptScroll != null && $('#messages')) $('#messages').scrollTop = transcriptScroll;
+  if (pageScroll != null && $('.main-panel > .page')) $('.main-panel > .page').scrollTop = pageScroll;
+  if (sidebarScroll != null && $('.session-list')) $('.session-list').scrollTop = sidebarScroll;
+  if (home)
+    mountGraph(state.project || emptyGraphProject, state.graph, {
       e,
       icon,
       button,
@@ -629,12 +798,10 @@ function render() {
     });
 }
 function scrollMessages(smooth = true) {
-  requestAnimationFrame(() =>
-    window.scrollTo({
-      top: document.documentElement.scrollHeight,
-      behavior: smooth ? 'smooth' : 'instant',
-    }),
-  );
+  requestAnimationFrame(() => {
+    const transcript = $('#messages');
+    if (transcript) transcript.scrollTop = transcript.scrollHeight;
+  });
 }
 
 async function saveCurriculum(curriculum) {
@@ -805,9 +972,8 @@ function noteDialog(note = null, initialBody = '') {
 }
 function modelSetup(existing = null) {
   const provider = existing?.provider || 'openai';
-  showDialog(
-    'Connect an AI model',
-    `<p class="muted small">Choose a provider, enter its credentials, and choose your model. Keys stay on your computer.</p><form id="connection-form"><label class="field">Provider<select name="provider" id="provider-select" ${existing ? 'disabled' : ''}><option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option><option value="anthropic" ${provider === 'anthropic' ? 'selected' : ''}>Anthropic (Claude)</option><option value="google" ${provider === 'google' ? 'selected' : ''}>Google Gemini</option><option value="custom" ${provider === 'custom' ? 'selected' : ''}>OpenAI-compatible / local model</option></select></label><div id="custom-fields" class="${provider === 'custom' ? '' : 'hidden'}">${field('API base URL', 'baseUrl', existing?.baseUrl || 'http://localhost:11434/v1', 'http://localhost:11434/v1')}<div class="provider-presets" style="margin-top:-9px;margin-bottom:15px"><button type="button" data-preset="http://localhost:11434/v1">Ollama</button><button type="button" data-preset="http://localhost:1234/v1">LM Studio</button><button type="button" data-preset="http://localhost:8080/v1">llama.cpp</button></div></div><label class="field"><span id="key-label">API key${provider === 'custom' ? ' (optional)' : ''}</span><input class="input" type="password" name="apiKey" autocomplete="off" placeholder="${existing?.hasKey ? 'Leave blank to keep existing key' : 'Paste your API key'}"><span class="hint" id="key-hint">${provider === 'custom' ? 'No key is needed for many local model servers.' : 'The key will be stored locally and never exported.'}</span></label><label class="field">Model<div class="row"><input class="input grow" name="model" list="model-options" value="${e(existing?.model || '')}" placeholder="Choose or type model ID" required><button class="button" type="button" id="discover-models">Find models</button></div><datalist id="model-options"></datalist><span id="discovery-hint" class="hint">Use Find models to list available models, or enter an ID manually.</span></label><label class="field">Connection name (optional)<input class="input" name="label" value="${e(existing?.label || '')}" placeholder="e.g. Local Ollama"></label><div id="connect-error" class="error hidden"></div><div class="row" style="justify-content:flex-end"><button type="button" class="button ghost" id="back-models">Back</button><button type="submit" class="button primary">${icon('check')} Test &amp; connect</button></div><p class="small muted" style="margin:9px 0 0;text-align:right">Tests with a tiny model request (your provider's normal billing applies).</p></form>`,
+  showSettings(
+    `<h3 class="settings-section-title">Providers</h3><div class="settings-section-label">${existing ? 'Edit provider' : 'Add a provider'}</div><form id="connection-form"><label class="field">Provider<select name="provider" id="provider-select" ${existing ? 'disabled' : ''}><option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option><option value="anthropic" ${provider === 'anthropic' ? 'selected' : ''}>Anthropic (Claude)</option><option value="google" ${provider === 'google' ? 'selected' : ''}>Google Gemini</option><option value="custom" ${provider === 'custom' ? 'selected' : ''}>OpenAI-compatible / local model</option></select></label><div id="custom-fields" class="${provider === 'custom' ? '' : 'hidden'}">${field('API base URL', 'baseUrl', existing?.baseUrl || 'http://localhost:11434/v1', 'http://localhost:11434/v1')}<div class="provider-presets" style="margin-top:-9px;margin-bottom:15px"><button type="button" data-preset="http://localhost:11434/v1">Ollama</button><button type="button" data-preset="http://localhost:1234/v1">LM Studio</button><button type="button" data-preset="http://localhost:8080/v1">llama.cpp</button></div></div><label class="field"><span id="key-label">API key${provider === 'custom' ? ' (optional)' : ''}</span><input class="input" type="password" name="apiKey" autocomplete="off" placeholder="${existing?.hasKey ? 'Leave blank to keep existing key' : 'Paste your API key'}"><span class="hint" id="key-hint">${provider === 'custom' ? 'No key is needed for many local model servers.' : 'The key will be stored locally and never exported.'}</span></label><label class="field">Model<div class="row"><input class="input grow" name="model" list="model-options" value="${e(existing?.model || '')}" placeholder="Choose or type model ID" required><button class="button" type="button" id="discover-models">Find models</button></div><datalist id="model-options"></datalist><span id="discovery-hint" class="hint">Use Find models to list available models, or enter an ID manually.</span></label><label class="field">Connection name (optional)<input class="input" name="label" value="${e(existing?.label || '')}" placeholder="e.g. Local Ollama"></label><div id="connect-error" class="error hidden"></div><div class="row" style="justify-content:flex-end"><button type="button" class="button ghost" id="back-models">Back</button><button type="submit" class="button primary">${icon('check')} Test &amp; connect</button></div><p class="small muted" style="margin:9px 0 0;text-align:right">Tests with a tiny model request (your provider's normal billing applies).</p></form>`,
   );
   const form = $('#connection-form', dialog);
   const data = () => {
@@ -915,15 +1081,38 @@ function modelSetup(existing = null) {
   $('#back-models', dialog).onclick = () => modelDialog();
 }
 function modelDialog() {
-  if (!state.connections.connections.length) {
-    modelSetup();
-    return;
-  }
-  showDialog(
-    'AI models',
-    `<p class="small muted">Choose a model for teaching, practice, and curriculum planning. You can switch at any time.</p>${state.connections.connections.map((c) => `<div class="connection-row"><div class="provider-badge">${e(c.label.slice(0, 1))}</div><div class="grow"><strong class="truncate">${e(c.label)}</strong><div class="small muted truncate">${e(c.model)}</div></div>${c.id === state.connections.activeConnection ? '<span class="tag complete">Active</span>' : button('Use', 'activate-model', { style: 'minor', data: { 'data-id': c.id } })}${ib('edit', 'edit-model', 'Edit connection', { 'data-id': c.id })}${ib('trash', 'delete-model', 'Remove connection', { 'data-id': c.id }, 'danger')}</div>`).join('')}`,
-    button('Add connection', 'add-model', { style: 'primary', i: 'plus' }),
+  showSettings(
+    `<h3 class="settings-section-title">Providers</h3><div class="settings-section-label">Model API keys</div>${state.connections.connections.map((c) => `<div class="settings-provider-row"><div class="grow"><div class="provider-name">${e(c.label)}</div><div class="small muted truncate">${e(c.model)}</div></div>${c.id === state.connections.activeConnection ? '<span class="muted small">Active</span>' : button('Use', 'activate-model', { style: 'minor', data: { 'data-id': c.id } })}${ib('edit', 'edit-model', 'Edit connection', { 'data-id': c.id })}${ib('trash', 'delete-model', 'Remove connection', { 'data-id': c.id }, 'danger')}</div>`).join('')}<button class="settings-add-provider" data-action="add-model">${icon('plus')} Add a provider</button><div class="settings-rule"></div><p class="settings-note">Model keys stay in this installation. They are never included in exported projects.</p>`,
   );
+}
+function openModelPicker(target) {
+  const control = target.closest('.model-control');
+  const wasOpen = Boolean($('.model-popover', control));
+  $$('.model-popover').forEach((p) => p.remove());
+  if (wasOpen) return;
+  const pop = document.createElement('div');
+  pop.className = 'model-popover';
+  pop.innerHTML = `<input class="model-search" aria-label="Search models" placeholder="Search models…"><div class="model-picker-list"></div><button class="model-picker-footer" data-action="add-model">${state.connections.connections.length ? '+ Add a provider' : 'No models — add a provider key in Settings'}</button>`;
+  control.append(pop);
+  const input = $('input', pop),
+    list = $('.model-picker-list', pop);
+  const update = () => {
+    const query = input.value.toLowerCase().trim();
+    const models = state.connections.connections.filter((c) =>
+      `${c.label} ${c.model}`.toLowerCase().includes(query),
+    );
+    list.innerHTML = models.length
+      ? models
+          .map(
+            (c) =>
+              `<button class="model-picker-row" data-action="pick-model" data-id="${e(c.id)}"><span class="grow truncate">${e(c.model)}</span>${c.id === state.connections.activeConnection ? icon('check') : ''}</button>`,
+          )
+          .join('')
+      : '<div class="model-picker-empty">No models match.</div>';
+  };
+  input.addEventListener('input', update);
+  update();
+  input.focus();
 }
 
 function newProjectDialog() {
@@ -947,8 +1136,219 @@ function newProjectDialog() {
     { submit: 'Create project' },
   );
 }
+function projectDialog() {
+  showDialog(
+    'Projects',
+    `${state.projects.map((p) => `<button class="project-menu-row" data-action="open-project" data-id="${e(p.id)}">${icon('folder')}<span class="grow truncate">${e(p.name)}</span>${p.id === state.project?.id ? icon('check') : ''}</button>`).join('') || '<p class="muted small">No projects yet.</p>'}`,
+    `${button('Import .learn', 'import', { i: 'import' })}${button('New project', 'new-project', { i: 'folderPlus', style: 'primary' })}`,
+  );
+}
+function newDraft(mode) {
+  if (!canNavigate()) return;
+  state.view = 'draft';
+  state.homeMode = mode;
+  state.session = null;
+  state.lessonId = null;
+  state.homeDraft = '';
+  state.selectedMaterials = [];
+  state.practiceNodes = [];
+  state.planVisible = false;
+  if (window.innerWidth < 680) state.collapsed = true;
+  hashLocation();
+  render();
+  $('#home-form textarea')?.focus();
+}
+async function openSession(sessionId) {
+  if (!canNavigate()) return;
+  const s = state.project.sessions.find((v) => v.id === sessionId);
+  if (!s) return;
+  state.lessonId = s.lessonId;
+  state.mode = s.mode;
+  state.view = 'lesson';
+  state.session = await api(purl(`/sessions/${s.id}`));
+  state.selectedMaterials = state.session.materialIds.filter((id) =>
+    state.project.materials.some((m) => m.id === id),
+  );
+  state.draft = '';
+  state.answerChoice = '';
+  state.confidence = 50;
+  state.planVisible = false;
+  if (state.sessionFilter !== 'all') state.sessionFilter = s.mode;
+  if (window.innerWidth < 680) state.collapsed = true;
+  hashLocation();
+  render();
+  scrollMessages(false);
+}
+function choosePracticeNodes() {
+  if (!state.project) {
+    projectDialog();
+    return;
+  }
+  const nodes = state.project.graph.nodes;
+  showDialog(
+    'Pick nodes',
+    nodes.length
+      ? nodes
+          .map(
+            (n) =>
+              `<label class="check"><input type="checkbox" name="practice-node" value="${e(n.id)}" ${state.practiceNodes.includes(n.id) ? 'checked' : ''}><span><strong>${e(n.title)}</strong><small>${e(n.statement)}</small></span></label>`,
+          )
+          .join('')
+      : '<p class="muted">No concepts in your knowledge graph yet.</p>',
+    `<button class="button primary" type="button" id="apply-practice-nodes">Done</button>`,
+    true,
+  );
+  $('#apply-practice-nodes', dialog).onclick = () => {
+    state.practiceNodes = $$('input[name=practice-node]:checked', dialog).map(
+      (el) => el.value,
+    );
+    closeDialog();
+    render();
+  };
+}
+async function startLessonSession(lessonId, mode, message, materialIds = []) {
+  state.lessonId = lessonId;
+  state.mode = mode;
+  state.view = 'lesson';
+  state.session = null;
+  state.selectedMaterials = materialIds;
+  state.draft = '';
+  state.answerChoice = '';
+  state.confidence = 50;
+  state.planVisible = false;
+  state.homeDraft = '';
+  state.practiceNodes = [];
+  if (state.sessionFilter !== 'all') state.sessionFilter = mode;
+  const lesson = selectedLesson();
+  if (lesson) state.folded.delete(lesson.moduleId);
+  if (window.innerWidth < 680) state.collapsed = true;
+  closeDialog();
+  hashLocation();
+  render();
+  await turn(message);
+}
+async function startTopic(raw) {
+  if (state.busy) return;
+  const chosen =
+    state.project?.graph.nodes.filter((n) =>
+      state.practiceNodes.includes(n.id),
+    ) || [];
+  const topic =
+    String(raw || '').trim() ||
+    (chosen.length ? chosen.map((n) => n.title).join(', ') : '');
+  if (!topic) return;
+  state.homeDraft = topic;
+  if (!activeModel()) {
+    modelSetup();
+    return;
+  }
+  const mode = state.homeMode,
+    materials = [...state.selectedMaterials];
+  const message =
+    topic +
+    (mode === 'practice' && chosen.length
+      ? `\n\nPractice these knowledge concepts:\n${chosen.map((n) => `- ${n.title}: ${n.statement}`).join('\n')}`
+      : '');
+  const existing = lessons().find(
+    (l) => l.title.trim().toLowerCase() === topic.toLowerCase(),
+  );
+  if (existing) {
+    await startLessonSession(existing.id, mode, message, materials);
+    return;
+  }
+  if (!state.project) {
+    formDialog(
+      'Create a learning project',
+      `<p>Every session belongs to an independent project.</p>${field('Project name', 'name', topic.slice(0, 120), 'e.g. Linear Algebra', 'required maxlength="120"')}${field('First lesson', 'title', topic.slice(0, 300), 'Topic', 'required maxlength="300"')}`,
+      async (values) => {
+        const p = await api('/api/projects', {
+          method: 'POST',
+          data: { name: values.get('name') },
+        });
+        await loadProjects();
+        await openProject(p.id);
+        const saved = await api(purl('/curriculum'), {
+          method: 'PUT',
+          data: {
+            curriculum: [
+              { title: 'Topics', lessons: [{ title: values.get('title') }] },
+            ],
+          },
+        });
+        applyProject(saved);
+        await startLessonSession(
+          saved.curriculum[0].lessons[0].id,
+          mode,
+          message,
+        );
+      },
+      { submit: 'Create & start' },
+    );
+    return;
+  }
+  const modules = state.project.curriculum;
+  formDialog(
+    'Add topic to curriculum',
+    `<p>Choose where this session belongs in your project.</p>${field('Lesson title', 'title', topic.slice(0, 300), 'Topic', 'required maxlength="300"')}<label class="field">Module<select name="module">${modules.map((m) => `<option value="${e(m.id)}">${e(m.title)}</option>`).join('')}<option value="new">New module</option></select></label><div id="new-module-field" ${modules.length ? 'class="hidden"' : ''}>${field('New module name', 'moduleName', 'Topics', 'Module name', 'maxlength="300"')}</div><label class="field" id="topic-position">Position<select name="after"><option value="end">At end</option></select></label>`,
+    async (values) => {
+      const curriculum = curriculumCopy();
+      let target = curriculum.find((m) => m.id === values.get('module'));
+      if (!target) {
+        const title = String(values.get('moduleName') || '').trim();
+        if (!title) throw Error('Enter a module name.');
+        target = { title, lessons: [] };
+        curriculum.push(target);
+      }
+      const lesson = { title: values.get('title') },
+        after = values.get('after');
+      const idx =
+        after === 'start'
+          ? 0
+          : after === 'end'
+            ? target.lessons.length
+            : target.lessons.findIndex((l) => l.id === after) + 1;
+      target.lessons.splice(idx, 0, lesson);
+      const moduleIdx = curriculum.indexOf(target);
+      const saved = await api(purl('/curriculum'), {
+        method: 'PUT',
+        data: { curriculum },
+      });
+      applyProject(saved);
+      await startLessonSession(
+        saved.curriculum[moduleIdx].lessons[idx].id,
+        mode,
+        message,
+        materials,
+      );
+    },
+    { submit: 'Add & start' },
+  );
+  const form = $('#modal-form', dialog);
+  const updatePositions = () => {
+    const module = modules.find((m) => m.id === form.elements.module.value);
+    $('#new-module-field', dialog).classList.toggle('hidden', Boolean(module));
+    $('#topic-position', dialog).classList.toggle('hidden', !module);
+    form.elements.after.innerHTML =
+      '<option value="end">At end</option><option value="start">At beginning</option>' +
+      (module?.lessons || [])
+        .map((l) => `<option value="${e(l.id)}">After ${e(l.title)}</option>`)
+        .join('');
+  };
+  form.elements.module.addEventListener('change', updatePositions);
+  updatePositions();
+}
+function sessionOptions() {
+  showDialog(
+    'Session options',
+    `<div class="stack">${button('New session', 'new-session', { i: 'plus' })}${button(state.project.progress[state.lessonId] === 'complete' ? 'Lesson complete' : 'Mark complete', 'progress', { i: 'flag' })}${button(state.mode === 'learn' ? 'Switch to practice' : 'Switch to teaching', 'mode', { i: state.mode === 'learn' ? 'dumbbell' : 'book', data: { 'data-mode': state.mode === 'learn' ? 'practice' : 'learn' } })}${state.session ? button('Delete session', 'delete-session', { i: 'trash', style: 'danger', data: { 'data-id': state.session.id } }) : ''}</div>`,
+  );
+}
 function chooseMaterials() {
   const p = state.project;
+  if (!p) {
+    projectDialog();
+    return;
+  }
   showDialog(
     'Session sources',
     `<p class="small muted">Select files the tutor should receive with your messages. Only selected files are sent to your AI provider.</p>${p.materials.length ? p.materials.map((m) => `<label class="check"><input type="checkbox" name="source" value="${e(m.id)}" ${state.selectedMaterials.includes(m.id) ? 'checked' : ''}><span><strong>${e(m.name)}</strong><small>${e(sizeLabel(m.size))}</small></span></label>`).join('') : '<p class="muted">No source files in this project yet.</p>'}`,
@@ -1022,18 +1422,20 @@ async function makeSession() {
   });
   await refreshProject();
   state.session = session;
+  hashLocation();
   state.selectedMaterials = [];
   render();
   return session;
 }
-async function turn(message) {
+async function turn(message, draftText = message) {
   if (state.busy) return;
   if (!activeModel()) {
-    modelDialog();
+    state.draft = draftText;
+    modelSetup();
     return;
   }
   if (!message.trim()) return;
-  state.draft = message;
+  state.draft = draftText;
   const selected = [...state.selectedMaterials];
   if (!state.session) {
     await makeSession();
@@ -1051,8 +1453,10 @@ async function turn(message) {
       signal: controller.signal,
     });
     await refreshProject();
+    state.answerChoice = '';
+    state.confidence = 50;
   } catch (err) {
-    state.draft = message;
+    state.draft = draftText;
     toast(errorMessage(err), err.name !== 'AbortError');
   } finally {
     state.busy = null;
@@ -1064,7 +1468,7 @@ async function turn(message) {
 async function plan(message) {
   if (state.busy) return;
   if (!activeModel()) {
-    modelDialog();
+    modelSetup();
     return;
   }
   if (!message.trim()) return;
@@ -1102,8 +1506,12 @@ async function deleteGraphNode(id) {
     },
   );
 }
-async function uploadFiles(files) {
-  if (!state.project || !canNavigate()) return;
+async function uploadFiles(files, attach = false) {
+  if (!state.project) {
+    projectDialog();
+    return;
+  }
+  if (!canNavigate()) return;
   for (const file of files) {
     if (file.size > 20 * 1024 * 1024) {
       toast(`${file.name} exceeds the 20 MB limit.`, true);
@@ -1115,12 +1523,19 @@ async function uploadFiles(files) {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+    const oldIds = new Set(state.project.materials.map((m) => m.id));
     applyProject(
       await api(purl('/materials'), {
         method: 'POST',
         data: { name: file.name, mime: file.type, data },
       }),
     );
+    if (attach)
+      state.selectedMaterials.push(
+        ...state.project.materials
+          .filter((m) => !oldIds.has(m.id))
+          .map((m) => m.id),
+      );
   }
   closeDialog();
   render();
@@ -1128,11 +1543,27 @@ async function uploadFiles(files) {
 }
 
 document.addEventListener('submit', (event) => {
-  if (event.target.id === 'lesson-form') {
+  if (event.target.id === 'home-form') {
     event.preventDefault();
-    turn(event.target.elements.message.value).catch((err) =>
+    startTopic(event.target.elements.topic.value).catch((err) =>
       toast(errorMessage(err), true),
     );
+  }
+  if (event.target.id === 'lesson-form') {
+    event.preventDefault();
+    const draft = event.target.elements.message.value;
+    let message = draft;
+    const q = activeQuestion();
+    if (q && state.answerChoice) {
+      const choice =
+        state.answerChoice === 'unknown'
+          ? "I don't know"
+          : q.options[Number(state.answerChoice)];
+      if (choice)
+        message = `Answer: ${choice}\nConfidence: ${state.confidence}%${draft.trim() ? `\nMy thinking: ${draft}` : ''}`;
+    } else if (q && draft.trim() && !q.options.length)
+      message = `My answer: ${draft}\nConfidence: ${state.confidence}%`;
+    turn(message, draft).catch((err) => toast(errorMessage(err), true));
   }
   if (event.target.id === 'planner-form') {
     event.preventDefault();
@@ -1142,19 +1573,44 @@ document.addEventListener('submit', (event) => {
   }
 });
 document.addEventListener('input', (event) => {
-  if (event.target.closest('#lesson-form') && event.target.name === 'message')
+  if (event.target.id === 'session-search') {
+    state.sidebarQuery = event.target.value;
+    $('#sidebar-rows').innerHTML = sessionRows();
+  }
+  if (event.target.closest('#home-form') && event.target.name === 'topic') {
+    state.homeDraft = event.target.value;
+    const btn = $('#home-form button[type=submit]');
+    if (btn)
+      btn.disabled = !state.homeDraft.trim() && !state.practiceNodes.length;
+  }
+  if (event.target.id === 'confidence') {
+    state.confidence = Number(event.target.value);
+    event.target.style.setProperty('--confidence', `${state.confidence}%`);
+    $('#confidence-value').textContent = `${state.confidence}%`;
+  }
+  if (event.target.closest('#lesson-form') && event.target.name === 'message') {
     state.draft = event.target.value;
+    const btn = $('#lesson-form button[type=submit]');
+    if (btn) btn.disabled = !state.draft.trim() && !state.answerChoice;
+  }
   if (event.target.closest('#planner-form') && event.target.name === 'message')
     state.plannerDraft = event.target.value;
 });
 document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && $('.model-popover')) {
+    $$('.model-popover').forEach((p) => p.remove());
+    return;
+  }
   if (
-    (event.metaKey || event.ctrlKey) &&
     event.key === 'Enter' &&
+    !event.isComposing &&
     event.target.tagName === 'TEXTAREA'
   ) {
     const form = event.target.closest('form');
-    if (form?.id === 'lesson-form' || form?.id === 'planner-form') {
+    if (
+      (['home-form', 'lesson-form'].includes(form?.id) && !event.shiftKey) ||
+      (form?.id === 'planner-form' && (event.metaKey || event.ctrlKey))
+    ) {
       event.preventDefault();
       form.requestSubmit();
     }
@@ -1162,6 +1618,17 @@ document.addEventListener('keydown', (event) => {
 });
 document.addEventListener('change', async (event) => {
   try {
+    if (
+      event.target.name === 'choice' &&
+      event.target.closest('#lesson-form')
+    ) {
+      state.answerChoice = event.target.value;
+      $$('.quiz-option').forEach((row) =>
+        row.classList.toggle('selected', $('input', row).checked),
+      );
+      const btn = $('#lesson-form button[type=submit]');
+      if (btn) btn.disabled = !state.draft.trim() && !state.answerChoice;
+    }
     if (event.target.id === 'session-select' && event.target.value) {
       if (!canNavigate()) {
         render();
@@ -1198,30 +1665,40 @@ $('#import-file').addEventListener('change', async (event) => {
 $('#material-file').addEventListener('change', (event) => {
   const files = [...event.target.files];
   event.target.value = '';
+  const attach = state.attachUpload;
+  state.attachUpload = false;
   if (files.length)
-    uploadFiles(files).catch((err) => toast(errorMessage(err), true));
+    uploadFiles(files, attach).catch((err) => toast(errorMessage(err), true));
 });
 document.addEventListener('dragover', (event) => {
-  const zone = event.target.closest('#dropzone');
-  if (zone) {
+  const zone = event.target.closest(
+    '#dropzone,[data-drop-composer],.home-workspace',
+  );
+  if (zone && event.dataTransfer?.types?.includes('Files')) {
     event.preventDefault();
     zone.classList.add('dragging');
   }
 });
 document.addEventListener('dragleave', (event) =>
-  event.target.closest('#dropzone')?.classList.remove('dragging'),
+  event.target
+    .closest('#dropzone,[data-drop-composer],.home-workspace')
+    ?.classList.remove('dragging'),
 );
 document.addEventListener('drop', (event) => {
-  const zone = event.target.closest('#dropzone');
-  if (zone) {
+  const zone = event.target.closest(
+    '#dropzone,[data-drop-composer],.home-workspace',
+  );
+  if (zone && event.dataTransfer?.files?.length) {
     event.preventDefault();
     zone.classList.remove('dragging');
-    uploadFiles([...event.dataTransfer.files]).catch((err) =>
-      toast(errorMessage(err), true),
+    uploadFiles([...event.dataTransfer.files], zone.id !== 'dropzone').catch(
+      (err) => toast(errorMessage(err), true),
     );
   }
 });
 document.addEventListener('click', async (event) => {
+  if (!event.target.closest('.model-control'))
+    $$('.model-popover').forEach((p) => p.remove());
   const target = event.target.closest('[data-action]');
   if (!target) return;
   const {
@@ -1239,30 +1716,66 @@ document.addEventListener('click', async (event) => {
         closeDialog();
         break;
       case 'library':
-        if (!canNavigate()) break;
-        state.project = null;
-        state.view = 'library';
-        await loadProjects();
-        hashLocation();
-        render();
-        window.scrollTo(0, 0);
+      case 'projects':
+        if (canNavigate()) projectDialog();
+        break;
+      case 'home':
+        if (canNavigate()) {
+          state.graph.view = 'graph';
+          state.graph.fit = true;
+          go('overview');
+        }
         break;
       case 'new-project':
         newProjectDialog();
         break;
       case 'open-project':
+        closeDialog();
         await openProject(id);
         break;
       case 'import':
         if (canNavigate()) $('#import-file').click();
         break;
       case 'go':
+        closeDialog();
         go(view);
         break;
       case 'lesson':
-        await selectLesson(id, 'learn');
+        closeDialog();
+        await selectLesson(id, mode || 'learn');
+        break;
+      case 'open-session':
+        await openSession(id);
+        break;
+      case 'draft':
+        newDraft(mode);
+        break;
+      case 'home-mode':
+        state.homeMode = mode;
+        render();
+        break;
+      case 'session-filter':
+        state.sessionFilter = mode;
+        render();
+        break;
+      case 'practice-nodes':
+        choosePracticeNodes();
+        break;
+      case 'graph-materials':
+        if (state.project) {
+          state.attachUpload = false;
+          $('#material-file').click();
+        } else projectDialog();
+        break;
+      case 'toggle-plan':
+        state.planVisible = !state.planVisible;
+        render();
+        break;
+      case 'session-options':
+        sessionOptions();
         break;
       case 'mode':
+        closeDialog();
         await selectLesson(state.lessonId, mode);
         break;
       case 'toggle-sidebar':
@@ -1276,6 +1789,20 @@ document.addEventListener('click', async (event) => {
         break;
       case 'models':
         modelDialog();
+        break;
+      case 'settings-data':
+        closeDialog();
+        go('data');
+        break;
+      case 'model-picker':
+        openModelPicker(target);
+        break;
+      case 'pick-model':
+        state.connections = await api(`/api/connections/${id}/activate`, {
+          method: 'POST',
+        });
+        render();
+        toast('Model switched.');
         break;
       case 'add-model':
         modelSetup();
@@ -1387,8 +1914,11 @@ document.addEventListener('click', async (event) => {
         break;
       case 'new-session':
         if (canNavigate()) {
+          closeDialog();
           await makeSession();
           state.draft = '';
+          state.answerChoice = '';
+          state.confidence = 50;
           render();
         }
         break;
@@ -1483,6 +2013,9 @@ document.addEventListener('click', async (event) => {
         chooseMaterials();
         break;
       case 'upload-material':
+        state.attachUpload =
+          dialog.open &&
+          $('#dialog-title', dialog)?.textContent === 'Session sources';
         $('#material-file').click();
         break;
       case 'delete-material': {
@@ -1569,10 +2102,29 @@ document.addEventListener('click', async (event) => {
           async () => {
             await api(purl(), { method: 'DELETE' });
             state.project = null;
-            state.view = 'library';
+            state.view = 'overview';
+            state.session = null;
+            state.lessonId = null;
+            state.selectedMaterials = [];
+            state.practiceNodes = [];
+            state.homeDraft = '';
+            state.sidebarQuery = '';
+            state.graph = {
+              query: '',
+              lesson: '',
+              view: 'graph',
+              selected: null,
+              zoom: 1,
+              x: 0,
+              y: 0,
+              fit: true,
+            };
             await loadProjects();
-            hashLocation();
-            render();
+            if (state.projects.length) await openProject(state.projects[0].id);
+            else {
+              hashLocation();
+              render();
+            }
           },
           'Delete project',
         );
@@ -1600,7 +2152,14 @@ async function boot() {
     await Promise.all([loadProjects(), loadConnections()]);
     const parts = location.hash.slice(1).split('/').map(decodeURIComponent);
     if (parts[0] && state.projects.some((p) => p.id === parts[0]))
-      await openProject(parts[0], parts[1] || 'overview', parts[2], parts[3]);
+      await openProject(
+        parts[0],
+        parts[1] || 'overview',
+        parts[2],
+        parts[3],
+        parts[4],
+      );
+    else if (state.projects.length) await openProject(state.projects[0].id);
     else render();
   } catch (err) {
     root.innerHTML = `<div class="boot"><span class="wordmark">minilearn</span><p>${e(errorMessage(err))}</p><button class="button" id="retry-boot">Try again</button></div>`;

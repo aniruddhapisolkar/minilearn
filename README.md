@@ -15,14 +15,14 @@ npm start
 
 Open **http://127.0.0.1:3210** in your browser. The server listens on your computer only; no account or app subscription is required.
 
-1. Click **Connect model**. Choose OpenAI, Anthropic, Google Gemini, or an OpenAI-compatible endpoint. Paste a key if needed, find or enter a model, and test the connection. For local servers, minilearn provides Ollama, LM Studio, and llama.cpp presets.
-2. Create a learning project. Add modules and lessons yourself, paste an outline, or chat with the curriculum planner. Review proposed changes before applying them.
-3. Open any lesson to learn or practice. The tutor adapts to your understanding and records demonstrated concepts in an optional knowledge map.
+1. Click **Add a provider key** in the bottom dock, or open **Settings → Providers**. Choose OpenAI, Anthropic, Google Gemini, or an OpenAI-compatible endpoint. Paste a key if needed, find or enter a model, and test the connection. For local servers, minilearn provides Ollama, LM Studio, and llama.cpp presets.
+2. Create a learning project from the sidebar. Add modules and lessons yourself, paste an outline, or chat with the curriculum planner using the Curriculum button in the project toolbar. Review proposed changes before applying them.
+3. Open any lesson, or start a teaching or practice session directly from the graph home's bottom composer. New topics can be inserted into any module. The tutor adapts to your understanding and records demonstrated concepts in the project's knowledge graph.
 
 ## Your workspace
 
 - **Curriculum:** Add, edit, reorder, move, or delete any topic within a module. AI can propose precise edits anywhere in the existing curriculum without changing unrelated lessons. Existing lesson IDs carry their sessions and progress when moved.
-- **Learn and practice:** Learner-paced teaching, reasoning checks, problems, feedback, and hints. Keep separate sessions for each lesson, delete individual exchanges, and save useful replies as editable study notes.
+- **Learn and practice:** Learner-paced teaching, reasoning checks, problems, feedback, and hints. Predictions and checks can appear in dedicated answer cards with choices, a confidence slider, and a thinking field. Keep separate sessions for each lesson, delete individual exchanges, and save useful replies as editable study notes.
 - **Study materials:** Upload local files; they are copied into the project. Select which files the tutor receives. Text, images, and PDFs are supported as model inputs when the selected provider/model accepts them.
 - **Knowledge map:** Inspect claims and their dependencies using a calm, layered graph. Pan, zoom, fit, search, filter by lesson, switch to a list, and inspect or delete individual concepts.
 - **Data & export:** See how much data is stored, selectively clear four independent categories, export `.learn` files, and permanently delete projects.
@@ -73,6 +73,6 @@ npm test      # storage, import/export, and provider/tutor API tests
 npm run check # syntax checks
 ```
 
-The app consists of a small Node HTTP server (`server/`) and a static browser UI (`web/`). Its appearance retains LearnHarness's dark palette, JetBrains Mono interface, Source Sans 3 reading text, and CMU Serif titles. The fonts are bundled locally with their open font licenses in `web/fonts/`; no font service or additional runtime dependency is needed. Provider requests run server-side. Markdown is sanitized before rendering, and KaTeX renders mathematical notation locally. The runtime has no Electron, plugin system, desktop subscription integration, or external frontend service.
+The app consists of a small Node HTTP server (`server/`) and a static browser UI (`web/`). The interface follows LearnHarness's original application layout: a session sidebar with search and filters, full-bleed knowledge graph, bottom composer dock, split-pane provider settings, and teaching answer cards. It retains the original dark palette, JetBrains Mono controls, Source Sans 3 reading text, and CMU Serif titles. The fonts are bundled locally with their open font licenses in `web/fonts/`; no font service or additional runtime dependency is needed. Provider requests run server-side. Markdown is sanitized before rendering, and KaTeX renders mathematical notation locally. The runtime has no Electron, plugin system, desktop subscription integration, or external frontend service.
 
 The original LearnHarness teaching and practice doctrine files are retained in `src/agent/prompts/` and adapted to the minilearn tutor's provider-neutral conversational contract.

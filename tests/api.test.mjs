@@ -73,7 +73,12 @@ test('complete API workflow: model setup, curriculum proposal, tutor, map, expor
       });
     else
       answer = JSON.stringify({
-        reply: 'What do you know about linear combinations? $a\\mathbf{v}$',
+        reply: 'Start with $a\\mathbf{v}$.',
+        question: {
+          kind: 'prediction',
+          prompt: 'What do you know about linear combinations?',
+          options: ['A weighted sum.', 'Only one vector.'],
+        },
         knowledge: [],
         complete: false,
       });
@@ -92,6 +97,7 @@ test('complete API workflow: model setup, curriculum proposal, tutor, map, expor
   for (const asset of [
     '/',
     '/app.js',
+    '/workspace.css',
     '/vendor/katex.css',
     '/fonts/jetbrains-mono-latin-wght-normal.woff2',
     '/fonts/jetbrains-mono-latin-wght-italic.woff2',
@@ -190,12 +196,24 @@ test('complete API workflow: model setup, curriculum proposal, tutor, map, expor
     materialIds: [],
   });
   assert.equal(first.messages.length, 2);
+  assert.equal(first.messages.at(-1).question.kind, 'prediction');
   assert.equal((await call(url)).graph.nodes.length, 0);
   const second = await call(url + `/sessions/${s.id}/turn`, 'POST', {
     message: 'A span contains every linear combination.',
     materialIds: [],
   });
   assert.equal(second.messages.length, 4);
+  assert.ok(
+    seen
+      .at(-1)
+      .messages.some(
+        (m) =>
+          m.role === 'assistant' &&
+          String(m.content).includes(
+            'What do you know about linear combinations?',
+          ),
+      ),
+  );
   const updated = await call(url);
   assert.equal(updated.graph.nodes.length, 1);
   assert.equal(updated.progress[lesson], 'complete');
@@ -218,6 +236,11 @@ test('complete API workflow: model setup, curriculum proposal, tutor, map, expor
   assert.equal(copy.curriculum[0].lessons[0].id, lesson);
   assert.equal(copy.graph.nodes.length, 1);
   assert.equal(copy.generated.length, 1);
+  const copiedSession = await call(`/api/projects/${copy.id}/sessions/${s.id}`);
+  assert.equal(
+    copiedSession.messages[1].question.prompt,
+    'What do you know about linear combinations?',
+  );
   assert.notEqual(copy.id, p.id);
   const trimmed = await call(
     url + `/sessions/${s.id}/exchanges/${second.messages.at(-1).id}`,

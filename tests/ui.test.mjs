@@ -44,7 +44,7 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
           },
         ],
       });
-    else if (last === 'Every combination of the basis vectors.')
+    else if (last.includes('Every combination of the basis vectors.'))
       answer = JSON.stringify({
         reply:
           'Exactly. The **span** contains all $a\\mathbf{v}+b\\mathbf{w}$.',
@@ -65,7 +65,16 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     else
       answer = JSON.stringify({
         reply:
-          'Let’s begin with the vectors you already know.\n\n$$a\\mathbf{v}+b\\mathbf{w}$$\n\nWhat does it mean to span a vector space?',
+          'Let’s begin with the vectors you already know.\n\n$$a\\mathbf{v}+b\\mathbf{w}$$',
+        question: {
+          kind: 'prediction',
+          prompt: 'What does it mean to span a vector space?',
+          options: [
+            'A single vector.',
+            'Every combination of the basis vectors.',
+            'Only the basis itself.',
+          ],
+        },
         knowledge: [],
         complete: false,
       });
@@ -189,13 +198,27 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   await import(
     `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
   );
-  await wait(() => heading('What are you learning?'), 'library');
+  await wait(() => heading('Knowledge graph'), 'graph home');
   assert.equal($('.wordmark').textContent, 'minilearn');
   assert.equal($('.brand svg'), null);
+  assert.ok($('.sidebar') && $('#home-form') && !$('.topbar'));
+  click('[data-action="model-picker"]');
+  assert.ok($('.model-picker-empty').textContent.includes('No models match'));
+  click('[data-action="home"]');
+  click('[data-action="draft"][data-mode="practice"]');
+  assert.ok(heading('New practice session'));
+  assert.equal(
+    $('#home-form textarea').placeholder,
+    'What do you want to practice?',
+  );
+  click('[data-action="home"]');
   click('[data-action="new-project"]');
   fill('#modal-form [name=name]', 'Linear Algebra');
   submit('#modal-form');
-  await wait(() => heading('Linear Algebra'), 'project created');
+  await wait(
+    () => $('.workspace-project')?.textContent.includes('Linear Algebra'),
+    'project created',
+  );
   click('[data-view="curriculum"]');
   await wait(() => heading('Curriculum'), 'curriculum page');
   click('[data-action="paste-outline"]');
@@ -208,6 +231,8 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   click('#replace-outline');
   await wait(() => heading('Module 1: Vector spaces'), 'curriculum saved');
   click('[data-action="models"]');
+  assert.ok($('.settings-rail') && $('.settings-content'));
+  click('[data-action="add-model"]');
   fill('#provider-select', 'custom');
   $('#provider-select').dispatchEvent(new w.Event('change', { bubbles: true }));
   fill('#connection-form [name=baseUrl]', modelUrl + '/v1');
@@ -217,17 +242,15 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     'discover model',
   );
   submit('#connection-form');
-  await wait(
-    () => $('.model-pill').textContent.includes('local-test'),
-    'connection saved',
-  );
+  await wait(() => !$('#dialog').open, 'connection saved');
   const spanLink = $$('.lesson-link').find(
-    (b) => b.textContent.trim() === 'Span',
+    (b) => $('.session-name', b)?.textContent.trim() === 'Span',
   );
   spanLink.click();
   await wait(() => heading('Span'), 'lesson selected');
   assert.equal($('.window-title').textContent, 'Span');
-  assert.ok($('.composer-label'));
+  assert.ok($('.opening-composer'));
+  assert.ok($('.model-pill').textContent.includes('local-test'));
   click('[data-action="begin-session"]');
   await wait(
     () =>
@@ -237,12 +260,21 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     'first tutor turn',
   );
   assert.ok($('.katex'), 'math rendered');
+  assert.ok($('.question-dock'));
+  assert.equal($$('.quiz-option').length, 4);
+  click('input[name="choice"][value="1"]');
+  fill('#confidence', '75');
+  assert.equal($('#confidence-value').textContent, '75%');
   fill('#lesson-form textarea', 'Every combination of the basis vectors.');
   submit('#lesson-form');
   await wait(
     () => document.body.textContent.includes('Exactly.'),
     'second tutor turn',
   );
+  assert.ok($('.past-question'));
+  click('[data-action="toggle-plan"]');
+  assert.ok($('.session-plan'));
+  click('[data-action="toggle-plan"]');
   click('[data-view="graph"]');
   await wait(
     () => $('#graph-stat')?.textContent.includes('2 concepts · 1 connection'),
@@ -263,7 +295,7 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   click('[data-graph="zoom-in"]');
   click('[data-graph="fit"]');
   click('[data-graph="toggle-view"]');
-  assert.ok($('.graph-list'));
+  assert.ok($('.chains-table'));
   click('[data-graph="toggle-view"]');
   assert.ok($('#graph-canvas'));
   click('[data-view="curriculum"]');
@@ -274,11 +306,38 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   click('[data-action="apply-proposal"]');
   await wait(
     () =>
-      $$('.lesson-link').some(
+      $$('.session-name').some(
         (b) => b.textContent.trim() === 'Linear independence',
       ),
     'AI insertion applied',
   );
+  // Start directly from the original-style home dock, without an extra page.
+  click('[data-action="home"]');
+  click('[data-action="home-mode"][data-mode="practice"]');
+  fill('#home-form textarea', 'Composition of maps');
+  submit('#home-form');
+  await wait(() => $('#topic-position'), 'topic placement dialog');
+  const moduleSelect = $('#modal-form select[name="module"]');
+  moduleSelect.selectedIndex = 1;
+  moduleSelect.dispatchEvent(new w.Event('change', { bubbles: true }));
+  $('#modal-form select[name="after"]').value = 'start';
+  submit('#modal-form');
+  await wait(
+    () =>
+      $('.window-title')?.textContent === 'Composition of maps' &&
+      $('.question-dock'),
+    'practice started from graph home',
+  );
+  assert.ok($('.mode-indicator').textContent.includes('Practice'));
+  assert.equal($('.session-filter .active').textContent, 'Practice');
+  assert.equal(
+    $('.session-folder:last-child .session-name')?.textContent,
+    'Composition of maps',
+  );
+  assert.equal(decodeURIComponent(w.location.hash).split('/').length, 5);
+  fill('#session-search', 'Composition');
+  assert.equal($$('.session-name').length, 1);
+  fill('#session-search', '');
   click('[data-view="data"]');
   click('[data-action="manage-history"]');
   assert.ok(document.body.textContent.includes('Learning sessions'));

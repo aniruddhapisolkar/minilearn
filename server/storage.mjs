@@ -449,7 +449,15 @@ function validateSession(value, relative) {
         !m ||
         !validId(m.id) ||
         !['user', 'assistant'].includes(m.role) ||
-        typeof m.content !== 'string',
+        typeof m.content !== 'string' ||
+        (m.question !== undefined &&
+          (m.role !== 'assistant' ||
+            !m.question ||
+            !['prediction', 'check', 'practice'].includes(m.question.kind) ||
+            typeof m.question.prompt !== 'string' ||
+            !Array.isArray(m.question.options) ||
+            m.question.options.length > 5 ||
+            m.question.options.some((v) => typeof v !== 'string'))),
     ) ||
     !Array.isArray(value.materialIds) ||
     value.materialIds.some((i) => !validId(i))

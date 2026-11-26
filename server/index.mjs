@@ -30,6 +30,7 @@ const assets = new Map([
   ['/app.js', ['web/app.js', 'text/javascript; charset=utf-8']],
   ['/graph.js', ['web/graph.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['web/styles.css', 'text/css; charset=utf-8']],
+  ['/workspace.css', ['web/workspace.css', 'text/css; charset=utf-8']],
   ...[
     'jetbrains-mono-latin-wght-normal.woff2',
     'jetbrains-mono-latin-wght-italic.woff2',

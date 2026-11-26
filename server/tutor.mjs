@@ -17,7 +17,7 @@ const practice = fs.readFileSync(
 const TEACHING = `You teach for understanding, not exposure. Begin by calibrating what the learner already knows; ask a focused diagnostic question if needed. Work toward the selected curriculum lesson. Build from a foundation the learner understands, motivate every new idea, teach one reasoning step, and ask one concise comprehension check before building on it. Prefer open predictions when the learner can discover the next step, and clear exposition when they cannot. Check actual reasoning, not recognition. If a check fails, diagnose the first misunderstanding and repair it before continuing. Do not rush or overwhelm the learner. Follow the pedagogical principles below, but speak naturally, never expose internal labels or tool names. Use Markdown and LaTeX math where useful. Keep each turn focused, with one question at a time. If the learner asks to go deeper, follow them while respecting the course goal.\n\n${method}`;
 const PRACTICE = `Use the following original LearnHarness practice methodology. Implement its tool mechanics as natural-language messages, not tool calls. Give one well-posed problem at a time. Do not reveal the solution before the learner attempts it or explicitly asks. Diagnose the first error, offer the smallest necessary hint, and adapt the next problem to the learner's evidence. Do not pose a new problem until the learner asks to move on after the current one is resolved. Use Markdown and LaTeX math.\n\n${practice}`;
 
-const OUTPUT_CONTRACT = `Respond with a single JSON object, without a code fence, matching this shape: {"reply":"learner-facing Markdown", "knowledge":[{"title":"concise concept or proposition name", "statement":"precise claim the learner has demonstrated", "premises":["exact existing node IDs or titles of new knowledge entries"]}], "complete":false}. The learner sees only reply. The knowledge map stores propositions and reasoning links, not ability ratings. Only add a knowledge claim when the learner's actual answer demonstrates it; never add merely because you explained it, because the curriculum lists it, or because you asked a question. Use an empty knowledge array until evidence exists. Premises must be logical dependencies of the claim, not just nearby topics. Use exact node IDs when available. Set complete=true only when the lesson's objectives have been demonstrated, or the learner explicitly confirms completion. Do not output answer keys in hidden metadata. JSON-escape backslashes in LaTeX, and put Markdown line breaks in JSON strings.`;
+const OUTPUT_CONTRACT = `Respond with a single JSON object, without a code fence, matching this shape: {"reply":"learner-facing Markdown", "question":{"kind":"prediction|check|practice","prompt":"one learner-facing question in Markdown","options":["choice 1","choice 2","choice 3"]}, "knowledge":[{"title":"concise concept or proposition name", "statement":"precise claim the learner has demonstrated", "premises":["exact existing node IDs or titles of new knowledge entries"]}], "complete":false}. The learner sees reply and the question in a separate answer card. Use question for the next prediction, comprehension check, or practice problem; omit it (or set null) when no question is needed. For open-ended questions and problems, use an empty options array. For multiple-choice checks, write two to five plausible options when useful, without an answer key; the app adds an explicit I don't know option. Do not repeat the question in reply. The learner may submit their choice, confidence, and reasoning, or ask for clarification. Use the reasoning as evidence, not confidence alone. The knowledge map stores propositions and reasoning links, not ability ratings. Only add a knowledge claim when the learner's actual answer demonstrates it; never add merely because you explained it, because the curriculum lists it, or because you asked a question. Use an empty knowledge array until evidence exists. Premises must be logical dependencies of the claim, not just nearby topics. Use exact node IDs when available. Set complete=true only when the lesson's objectives have been demonstrated, or the learner explicitly confirms completion. Do not output answer keys in hidden metadata. JSON-escape backslashes in LaTeX, and put Markdown line breaks in JSON strings.`;
 
 function extractJSON(raw) {
   const trimmed = raw
@@ -39,12 +39,45 @@ function recentMessages(messages, budget = 72000) {
   let used = 0;
   const recent = [];
   for (const m of messages.slice(-80).reverse()) {
-    if (recent.length && used + m.content.length > budget) break;
-    recent.unshift({ role: m.role, content: m.content });
-    used += m.content.length;
+    const content =
+      m.content +
+      (m.question
+        ? `\n\n${m.question.kind.toUpperCase()}: ${m.question.prompt}${m.question.options.length ? '\nChoices:\n' + m.question.options.map((v, i) => `${i + 1}. ${v}`).join('\n') : ''}`
+        : '');
+    if (recent.length && used + content.length > budget) break;
+    recent.unshift({ role: m.role, content });
+    used += content.length;
   }
   while (recent[0]?.role === 'assistant') recent.shift();
   return recent;
+}
+function questionFromModel(value, mode) {
+  if (!value || typeof value.prompt !== 'string' || !value.prompt.trim())
+    return null;
+  const kind = ['prediction', 'check', 'practice'].includes(value.kind)
+    ? value.kind
+    : mode === 'practice'
+      ? 'practice'
+      : 'check';
+  const options = Array.isArray(value.options)
+    ? [
+        ...new Set(
+          value.options
+            .filter(
+              (v) =>
+                typeof v === 'string' &&
+                v.trim() &&
+                v.trim().toLowerCase() !== "i don't know",
+            )
+            .map((v) => v.trim().slice(0, 2000)),
+        ),
+      ].slice(0, 5)
+    : [];
+  return {
+    kind,
+    prompt: value.prompt.trim().slice(0, 10000),
+    options: options.length >= 2 ? options : [],
+  };
 }
 function learnedContext(graph, lessonId) {
   return [...graph.nodes]
@@ -234,8 +267,11 @@ export async function runTutor(project, connection, sessionId, data, signal) {
   const raw = await generate(connection, system, messages, { signal });
   if (signal?.aborted) throw new AppError('Generation cancelled.', 499);
   const parsed = extractJSON(raw);
+  const question = questionFromModel(parsed?.question, session.mode);
   const valid =
-    parsed && typeof parsed.reply === 'string' && parsed.reply.trim();
+    parsed &&
+    typeof parsed.reply === 'string' &&
+    (parsed.reply.trim() || question);
   const reply = valid ? parsed.reply.trim() : raw;
   const replyId = randomUUID();
   session.messages.push(
@@ -249,6 +285,7 @@ export async function runTutor(project, connection, sessionId, data, signal) {
       id: replyId,
       role: 'assistant',
       content: reply,
+      ...(valid && question ? { question } : {}),
       createdAt: new Date().toISOString(),
     },
   );
@@ -258,7 +295,12 @@ export async function runTutor(project, connection, sessionId, data, signal) {
     updateKnowledge(project, session, replyId, parsed.knowledge);
   if (lesson.moduleTitle !== 'Archived lesson') {
     const previous = project.progress()[session.lessonId];
-    if (valid && parsed.complete === true && session.messages.length > 2)
+    if (
+      valid &&
+      !question &&
+      parsed.complete === true &&
+      session.messages.length > 2
+    )
       project.setProgress(session.lessonId, 'complete');
     else if (!previous) project.setProgress(session.lessonId, 'started');
   }

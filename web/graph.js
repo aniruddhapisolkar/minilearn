@@ -5,9 +5,9 @@ const width = 184,
   vgap = 44;
 const nodeY = 20;
 
-export function graphMarkup(project, state, { e, icon, button, pageHeader }) {
+export function graphMarkup(project, state, { e, icon, button }) {
   const lessons = project.curriculum.flatMap((m) => m.lessons);
-  return `<main class="page wide graph-page">${pageHeader('Knowledge map', 'Concepts you have demonstrated and their dependencies.', project.graph.nodes.length ? button('Clear map', 'clear-graph', { style: 'ghost', i: 'trash' }) : '')}<div class="graph-shell"><div class="graph-toolbar"><input class="input" id="graph-search" type="search" aria-label="Search knowledge" placeholder="Search nodes…" value="${e(state.query)}"><select id="graph-lesson" aria-label="Filter by lesson"><option value="">All lessons</option>${lessons.map((l) => `<option value="${e(l.id)}" ${state.lesson === l.id ? 'selected' : ''}>${e(l.title)}</option>`).join('')}</select><span class="spacer"></span><div class="row" id="graph-zoom-controls"><button class="icon-button" data-graph="zoom-out" title="Zoom out" aria-label="Zoom out">${icon('minus')}</button><span id="graph-zoom-level" class="small muted mono">100%</span><button class="icon-button" data-graph="zoom-in" title="Zoom in" aria-label="Zoom in">${icon('plus')}</button><button class="button minor ghost graph-fit" data-graph="fit" title="Fit the graph to view">${icon('fit')} Fit</button></div><button class="button minor" id="graph-view-switch" data-graph="toggle-view">${icon(state.view === 'list' ? 'graph' : 'list')} ${state.view === 'list' ? 'Graph' : 'List'}</button></div><div id="graph-body"></div><div id="graph-details"></div></div><div class="graph-stat" id="graph-stat"></div><p class="small muted">Drag to pan · Scroll to zoom · Select a concept to inspect</p></main>`;
+  return `<section class="graph-stage ${state.view === 'list' ? 'list-mode' : ''} ${project.graph.nodes.length ? 'has-nodes' : ''}"><div class="graph-toolbar"><span class="graph-stat" id="graph-stat"></span><span class="spacer"></span><div class="graph-search-controls"><input class="input" id="graph-search" type="search" aria-label="Search knowledge" placeholder="Search nodes…" value="${e(state.query)}"><select id="graph-lesson" aria-label="Filter by lesson"><option value="">All lessons</option>${lessons.map((l) => `<option value="${e(l.id)}" ${state.lesson === l.id ? 'selected' : ''}>${e(l.title)}</option>`).join('')}</select></div><div class="row" id="graph-zoom-controls"><button class="icon-button" data-graph="zoom-out" title="Zoom out" aria-label="Zoom out">${icon('minus')}</button><span id="graph-zoom-level" class="small muted mono">100%</span><button class="icon-button" data-graph="zoom-in" title="Zoom in" aria-label="Zoom in">${icon('plus')}</button><button class="button minor ghost graph-fit" data-graph="fit" title="Fit the graph to view">${icon('fit')} Fit</button></div><button class="graph-pill" id="graph-view-switch" data-graph="toggle-view">${icon(state.view === 'list' ? 'close' : 'list')} ${state.view === 'list' ? 'Graph' : 'Chains'}</button><button class="graph-pill graph-materials" data-action="graph-materials">${icon('graph')} Add files…</button></div><div id="graph-body"></div><div id="graph-details"></div>${project.graph.nodes.length ? `<div class="graph-bottom-actions">${button('Clear map', 'clear-graph', { style: 'ghost minor', i: 'trash' })}</div>` : ''}</section>`;
 }
 
 function layout(nodes, edges) {
@@ -197,26 +197,31 @@ export function mountGraph(project, state, { e, icon, button, ib, onDelete }) {
   }
   function draw() {
     const { nodes, edges } = filtered();
+    const stage = $('.graph-stage');
+    stage.classList.toggle('list-mode', state.view === 'list');
+    stage
+      .closest('.home-workspace')
+      ?.classList.toggle('chains-open', state.view === 'list');
     $('#graph-stat').textContent =
       `${nodes.length} ${nodes.length === 1 ? 'concept' : 'concepts'} · ${edges.length} ${edges.length === 1 ? 'connection' : 'connections'}${nodes.length !== fullNodes.length ? ` (of ${fullNodes.length} concepts)` : ''}`;
     $('#graph-view-switch').innerHTML =
-      `${icon(state.view === 'list' ? 'graph' : 'list')} ${state.view === 'list' ? 'Graph' : 'List'}`;
+      `${icon(state.view === 'list' ? 'close' : 'list')} ${state.view === 'list' ? 'Graph' : 'Chains'}`;
     $('#graph-zoom-controls').style.display =
       state.view === 'list' ? 'none' : 'flex';
-    if (!nodes.length) {
-      svg = null;
-      group = null;
-      body.innerHTML = `<div class="graph-empty">${icon('graph')}<strong>${fullNodes.length ? 'No matching concepts' : 'Your knowledge map is empty'}</strong><span>${fullNodes.length ? 'Try a different search or lesson.' : 'Concepts appear as your tutor checks what you understand.'}</span></div>`;
-      updateDetails();
-      return;
-    }
     if (state.view === 'list') {
       svg = null;
       group = null;
-      body.innerHTML = `<div class="graph-list">${nodes.map((n) => `<button data-node-id="${e(n.id)}"><strong>${e(n.title)}</strong><small>${e(n.statement)}</small></button>`).join('')}</div>`;
+      body.innerHTML = `<div class="chains-table"><div class="chain-table-head"><span>Name ↑</span><span>Links</span><span>Created</span></div>${nodes.length ? nodes.map((n) => `<button class="chain-table-row" data-node-id="${e(n.id)}"><div><strong>${e(n.title)}</strong><small>${e(n.statement)}</small></div><span>${fullEdges.filter((x) => x.from === n.id || x.to === n.id).length}</span><span>${e(n.createdAt?.slice(0, 10) || '—')}</span></button>`).join('') : '<div class="chain-table-empty">No matching chains.</div>'}</div>`;
       body
         .querySelectorAll('[data-node-id]')
         .forEach((b) => (b.onclick = () => setSelected(b.dataset.nodeId)));
+      updateDetails();
+      return;
+    }
+    if (!nodes.length) {
+      svg = null;
+      group = null;
+      body.innerHTML = `<div class="graph-empty">${icon('graph')}<h2>${fullNodes.length ? 'No matching concepts' : 'Knowledge graph'}</h2><p>${fullNodes.length ? 'Try a different search or lesson.' : 'Start a session to begin learning.'}</p>${fullNodes.length ? '' : '<span>Attach your material with the paperclip or drag and drop.</span>'}</div>`;
       updateDetails();
       return;
     }
