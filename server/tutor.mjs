@@ -264,7 +264,10 @@ export async function runTutor(project, connection, sessionId, data, signal) {
       attachments: references.attachments,
     },
   ];
-  const raw = await generate(connection, system, messages, { signal });
+  const raw = await generate(connection, system, messages, {
+    signal,
+    conversationId: JSON.stringify([project.id, 'lesson', session.id]),
+  });
   if (signal?.aborted) throw new AppError('Generation cancelled.', 499);
   const parsed = extractJSON(raw);
   const question = questionFromModel(parsed?.question, session.mode);
@@ -367,12 +370,18 @@ export async function runPlanner(project, connection, message, signal) {
   const content = requiredText(message, 'Message', 100000);
   const current = project.curriculum();
   const planner = project.planner();
+  // Persist a conversation identity with the history, so clearing the
+  // planner starts a new conversation instead of using the old route.
+  planner.id ||= randomUUID();
   const system = `${PLANNER_PROMPT}\n\nCURRENT CURRICULUM:\n${JSON.stringify(current)}\n\nPENDING PROPOSAL (not applied):\n${JSON.stringify(planner.proposal)}`;
   const raw = await generate(
     connection,
     system,
     [...recentMessages(planner.messages), { role: 'user', content }],
-    { signal },
+    {
+      signal,
+      conversationId: JSON.stringify([project.id, 'planner', planner.id]),
+    },
   );
   if (signal?.aborted) throw new AppError('Generation cancelled.', 499);
   const result = extractJSON(raw);

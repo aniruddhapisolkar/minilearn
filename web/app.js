@@ -972,8 +972,26 @@ function noteDialog(note = null, initialBody = '') {
 }
 function modelSetup(existing = null) {
   const provider = existing?.provider || 'openai';
+  const keyHint = (value) =>
+    value === 'custom'
+      ? 'No key is needed for many local model servers.'
+      : value === 'opencode-go'
+        ? 'Use your OpenCode Go key. Go is designed for coding agents; general tutoring may be restricted.'
+        : value === 'opencode'
+          ? 'Use your OpenCode Console key. Requests are billed to your workspace credits.'
+          : 'The key will be stored locally and never exported.';
+  const options = [
+    ['openai', 'OpenAI'],
+    ['anthropic', 'Anthropic (Claude)'],
+    ['google', 'Google Gemini'],
+    ['opencode-go', 'OpenCode Go'],
+    ['opencode', 'OpenCode (pay-as-you-go)'],
+    ['custom', 'OpenAI-compatible / local model'],
+  ]
+    .map(([id, name]) => `<option value="${id}" ${provider === id ? 'selected' : ''}>${name}</option>`)
+    .join('');
   showSettings(
-    `<h3 class="settings-section-title">Providers</h3><div class="settings-section-label">${existing ? 'Edit provider' : 'Add a provider'}</div><form id="connection-form"><label class="field">Provider<select name="provider" id="provider-select" ${existing ? 'disabled' : ''}><option value="openai" ${provider === 'openai' ? 'selected' : ''}>OpenAI</option><option value="anthropic" ${provider === 'anthropic' ? 'selected' : ''}>Anthropic (Claude)</option><option value="google" ${provider === 'google' ? 'selected' : ''}>Google Gemini</option><option value="custom" ${provider === 'custom' ? 'selected' : ''}>OpenAI-compatible / local model</option></select></label><div id="custom-fields" class="${provider === 'custom' ? '' : 'hidden'}">${field('API base URL', 'baseUrl', existing?.baseUrl || 'http://localhost:11434/v1', 'http://localhost:11434/v1')}<div class="provider-presets" style="margin-top:-9px;margin-bottom:15px"><button type="button" data-preset="http://localhost:11434/v1">Ollama</button><button type="button" data-preset="http://localhost:1234/v1">LM Studio</button><button type="button" data-preset="http://localhost:8080/v1">llama.cpp</button></div></div><label class="field"><span id="key-label">API key${provider === 'custom' ? ' (optional)' : ''}</span><input class="input" type="password" name="apiKey" autocomplete="off" placeholder="${existing?.hasKey ? 'Leave blank to keep existing key' : 'Paste your API key'}"><span class="hint" id="key-hint">${provider === 'custom' ? 'No key is needed for many local model servers.' : 'The key will be stored locally and never exported.'}</span></label><label class="field">Model<div class="row"><input class="input grow" name="model" list="model-options" value="${e(existing?.model || '')}" placeholder="Choose or type model ID" required><button class="button" type="button" id="discover-models">Find models</button></div><datalist id="model-options"></datalist><span id="discovery-hint" class="hint">Use Find models to list available models, or enter an ID manually.</span></label><label class="field">Connection name (optional)<input class="input" name="label" value="${e(existing?.label || '')}" placeholder="e.g. Local Ollama"></label><div id="connect-error" class="error hidden"></div><div class="row" style="justify-content:flex-end"><button type="button" class="button ghost" id="back-models">Back</button><button type="submit" class="button primary">${icon('check')} Test &amp; connect</button></div><p class="small muted" style="margin:9px 0 0;text-align:right">Tests with a tiny model request (your provider's normal billing applies).</p></form>`,
+    `<h3 class="settings-section-title">Providers</h3><div class="settings-section-label">${existing ? 'Edit provider' : 'Add a provider'}</div><form id="connection-form"><label class="field">Provider<select name="provider" id="provider-select" ${existing ? 'disabled' : ''}>${options}</select></label><div id="custom-fields" class="${provider === 'custom' ? '' : 'hidden'}">${field('API base URL', 'baseUrl', existing?.baseUrl || 'http://localhost:11434/v1', 'http://localhost:11434/v1')}<div class="provider-presets" style="margin-top:-9px;margin-bottom:15px"><button type="button" data-preset="http://localhost:11434/v1">Ollama</button><button type="button" data-preset="http://localhost:1234/v1">LM Studio</button><button type="button" data-preset="http://localhost:8080/v1">llama.cpp</button></div></div><label class="field"><span id="key-label">API key${provider === 'custom' ? ' (optional)' : ''}</span><input class="input" type="password" name="apiKey" autocomplete="off" placeholder="${existing?.hasKey ? 'Leave blank to keep existing key' : 'Paste your API key'}"><span class="hint" id="key-hint">${keyHint(provider)}</span></label><label class="field">Model<div class="row"><input class="input grow" name="model" list="model-options" value="${e(existing?.model || '')}" placeholder="Choose or type model ID" required><button class="button" type="button" id="discover-models">Find models</button></div><datalist id="model-options"></datalist><span id="discovery-hint" class="hint">Use Find models to list available models, or enter an ID manually.</span></label><label class="field">Connection name (optional)<input class="input" name="label" value="${e(existing?.label || '')}" placeholder="e.g. Local Ollama"></label><div id="connect-error" class="error hidden"></div><div class="row" style="justify-content:flex-end"><button type="button" class="button ghost" id="back-models">Back</button><button type="submit" class="button primary">${icon('check')} Test &amp; connect</button></div><p class="small muted" style="margin:9px 0 0;text-align:right">Tests with a tiny model request (your provider's normal billing applies).</p></form>`,
   );
   const form = $('#connection-form', dialog);
   const data = () => {
@@ -991,9 +1009,7 @@ function modelSetup(existing = null) {
     $('#custom-fields', dialog).classList.toggle('hidden', !custom);
     $('#key-label', dialog).textContent =
       `API key${custom ? ' (optional)' : ''}`;
-    $('#key-hint', dialog).textContent = custom
-      ? 'No key is needed for many local model servers.'
-      : 'The key will be stored locally and never exported.';
+    $('#key-hint', dialog).textContent = keyHint(event.target.value);
     form.elements.model.value = '';
     $('#model-options', dialog).innerHTML = '';
     $('#discovered-models', dialog)?.remove();

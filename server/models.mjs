@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { AppError, requiredText } from './storage.mjs';
 
 const PROVIDERS = {
@@ -7,6 +7,14 @@ const PROVIDERS = {
   google: {
     name: 'Google Gemini',
     url: 'https://generativelanguage.googleapis.com/v1beta',
+  },
+  opencode: {
+    name: 'OpenCode (pay-as-you-go)',
+    url: 'https://opencode.ai/inference',
+  },
+  'opencode-go': {
+    name: 'OpenCode Go',
+    url: 'https://opencode.ai/inference/go',
   },
   custom: { name: 'OpenAI-compatible', url: 'http://localhost:11434/v1' },
 };
@@ -79,16 +87,42 @@ export function selectedConnection(storage) {
     );
   return c;
 }
-function requestHeaders(c) {
+function nativeOpenCode(c) {
+  return c.provider === 'opencode' || c.provider === 'opencode-go';
+}
+function isOpenCode(c) {
+  // Also support existing custom connections to documented OpenCode URLs.
+  // Never attach OpenCode-specific routing data to unrelated custom hosts.
+  return (
+    nativeOpenCode(c) ||
+    (c.provider === 'custom' &&
+      /^https:\/\/opencode\.ai\/(?:zen(?:\/go)?\/v1|inference(?:\/go)?\/openai\/v1)$/.test(
+        c.baseUrl,
+      ))
+  );
+}
+function requestHeaders(c, conversationId) {
   const h = { 'content-type': 'application/json' };
   if (c.provider === 'anthropic') {
     h['x-api-key'] = c.apiKey;
     h['anthropic-version'] = '2023-06-01';
   } else if (c.provider === 'google') h['x-goog-api-key'] = c.apiKey;
   else if (c.apiKey) h.authorization = `Bearer ${c.apiKey}`;
+  if (isOpenCode(c)) {
+    h['user-agent'] = 'minilearn/0.1.0';
+    // Opaque, stable within this connection and conversation; no learner data
+    // or raw project identifiers need to be sent as routing metadata.
+    h['x-opencode-session'] = `ses_${createHash('sha256')
+      .update(JSON.stringify([c.id, conversationId ?? randomUUID()]))
+      .digest('hex')}`;
+  }
   return h;
 }
-async function request(c, endpoint, { body, signal, timeout = 120000 } = {}) {
+async function request(
+  c,
+  endpoint,
+  { body, signal, conversationId, timeout = 120000 } = {},
+) {
   let response;
   try {
     const effective = signal
@@ -96,7 +130,7 @@ async function request(c, endpoint, { body, signal, timeout = 120000 } = {}) {
       : AbortSignal.timeout(timeout);
     response = await fetch(c.baseUrl + endpoint, {
       method: body ? 'POST' : 'GET',
-      headers: requestHeaders(c),
+      headers: requestHeaders(c, conversationId),
       body: body ? JSON.stringify(body) : undefined,
       signal: effective,
       redirect: 'error',
@@ -148,18 +182,26 @@ export async function discoverModels(connection, signal) {
   }
   data = await request(
     connection,
-    connection.provider === 'anthropic' ? '/models?limit=100' : '/models',
+    nativeOpenCode(connection)
+      ? '/v1/models'
+      : connection.provider === 'anthropic'
+        ? '/models?limit=100'
+        : '/models',
     { signal, timeout: 20000 },
   );
   return (data.data || [])
     .filter(
       (m) =>
         typeof m.id === 'string' &&
+        (!nativeOpenCode(connection) || !m.type || m.type === 'chat') &&
         !/embedding|moderation|whisper|^tts|dall-e|^gpt-image|audio|realtime|rerank/i.test(
           m.id,
         ),
     )
-    .map((m) => ({ id: m.id, name: m.display_name || m.id }))
+    .map((m) => ({
+      id: m.id,
+      name: m.display_name || (nativeOpenCode(connection) && m.name) || m.id,
+    }))
     .sort((a, b) => a.id.localeCompare(b.id));
 }
 
@@ -202,7 +244,7 @@ export async function generate(
   connection,
   system,
   messages,
-  { signal, test = false } = {},
+  { signal, test = false, conversationId } = {},
 ) {
   const model = connection.model;
   let answer;
@@ -241,8 +283,12 @@ export async function generate(
       .map((p) => p.text)
       .join('\n');
   } else {
-    const result = await request(connection, '/chat/completions', {
+    const endpoint = nativeOpenCode(connection)
+      ? '/openai/v1/chat/completions'
+      : '/chat/completions';
+    const result = await request(connection, endpoint, {
       signal,
+      conversationId,
       body: {
         model,
         messages: [
@@ -252,7 +298,7 @@ export async function generate(
         ...(test
           ? connection.provider === 'openai'
             ? { max_completion_tokens: 512 }
-            : { max_tokens: 128 }
+            : { max_tokens: isOpenCode(connection) ? 1024 : 128 }
           : {}),
       },
     });

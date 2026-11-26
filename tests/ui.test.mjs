@@ -265,6 +265,12 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   click('[data-action="models"]');
   assert.ok($('.settings-rail') && $('.settings-content'));
   click('[data-action="add-model"]');
+  assert.ok($('#provider-select option[value="opencode"]'));
+  assert.ok($('#provider-select option[value="opencode-go"]'));
+  fill('#provider-select', 'opencode-go');
+  $('#provider-select').dispatchEvent(new w.Event('change', { bubbles: true }));
+  assert.ok($('#custom-fields').classList.contains('hidden'));
+  assert.match($('#key-hint').textContent, /coding agents/);
   fill('#provider-select', 'custom');
   $('#provider-select').dispatchEvent(new w.Event('change', { bubbles: true }));
   fill('#connection-form [name=baseUrl]', modelUrl + '/v1');

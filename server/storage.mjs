@@ -534,6 +534,7 @@ function validateProgress(value) {
 function validatePlanner(value) {
   if (
     !value ||
+    (value.id !== undefined && !validId(value.id)) ||
     !Array.isArray(value.messages) ||
     value.messages.some(
       (m) =>

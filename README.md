@@ -15,9 +15,11 @@ npm start
 
 Open **http://127.0.0.1:3210** in your browser. The server listens on your computer only; no account or app subscription is required.
 
-1. Click **Add a provider key** in the bottom dock, or open **Settings → Providers**. Choose OpenAI, Anthropic, Google Gemini, or an OpenAI-compatible endpoint. Paste a key if needed, find or enter a model, and test the connection. For local servers, minilearn provides Ollama, LM Studio, and llama.cpp presets.
+1. Click **Add a provider key** in the bottom dock, or open **Settings → Providers**. Choose OpenAI, Anthropic, Google Gemini, OpenCode, or an OpenAI-compatible endpoint. Paste a key if needed, find or enter a model, and test the connection. For local servers, minilearn provides Ollama, LM Studio, and llama.cpp presets.
 2. Create a learning project from the sidebar. Add modules and lessons yourself, paste an outline, or chat with the curriculum planner using the Curriculum button in the project toolbar. Review proposed changes before applying them.
 3. Open any lesson, or start a teaching or practice session directly from the graph home's bottom composer. New topics can be inserted into any module. The tutor adapts to your understanding and records demonstrated concepts in the project's knowledge graph.
+
+**OpenCode:** Select **OpenCode Go** for a Go subscription or **OpenCode (pay-as-you-go)** for workspace credits. Paste your Console API key and click **Find models**, then **Test & connect**. minilearn uses the official [Console inference endpoints](https://opencode.ai/docs/console/api/inference/) and sends its own user agent and stable, opaque conversation routing IDs. No header or URL configuration is needed. Go is intended for [coding-agent workloads](https://opencode.ai/docs/console/go/#where-can-i-use-it); general tutoring may be restricted, and successful requests are subject to your plan and provider's terms. Free chat models available only in OpenCode are not unlocked by minilearn.
 
 ## Your workspace
 
