@@ -89,11 +89,23 @@ test('complete API workflow: model setup, curriculum proposal, tutor, map, expor
     await close(fake);
     fs.rmSync(dir, { recursive: true, force: true });
   });
-  for (const asset of ['/', '/app.js', '/vendor/katex.css']) {
+  for (const asset of [
+    '/',
+    '/app.js',
+    '/vendor/katex.css',
+    '/fonts/jetbrains-mono-latin-wght-normal.woff2',
+    '/fonts/jetbrains-mono-latin-wght-italic.woff2',
+    '/fonts/source-sans-3-latin-wght-normal.woff2',
+    '/fonts/source-sans-3-latin-wght-italic.woff2',
+    '/fonts/cmu-serif-bold.ttf',
+  ]) {
     const response = await fetch(base + asset);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'no-store');
-    await response.arrayBuffer();
+    const bytes = await response.arrayBuffer();
+    assert.ok(bytes.byteLength > 0);
+    if (asset.startsWith('/fonts/'))
+      assert.match(response.headers.get('content-type'), /^font\//);
   }
   const call = async (url, method = 'GET', data, status = 200) => {
     const result = await fetch(base + url, {

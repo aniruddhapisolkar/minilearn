@@ -190,6 +190,8 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     `data:text/javascript;base64,${Buffer.from(source).toString('base64')}`
   );
   await wait(() => heading('What are you learning?'), 'library');
+  assert.equal($('.wordmark').textContent, 'minilearn');
+  assert.equal($('.brand svg'), null);
   click('[data-action="new-project"]');
   fill('#modal-form [name=name]', 'Linear Algebra');
   submit('#modal-form');
@@ -224,6 +226,8 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   );
   spanLink.click();
   await wait(() => heading('Span'), 'lesson selected');
+  assert.equal($('.window-title').textContent, 'Span');
+  assert.ok($('.composer-label'));
   click('[data-action="begin-session"]');
   await wait(
     () =>
@@ -244,6 +248,7 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     () => $('#graph-stat')?.textContent.includes('2 concepts · 1 connection'),
     'graph',
   );
+  assert.equal($$('.graph-dot').length, 2);
   const node = $$('[data-node-id]').find(
     (n) => n.getAttribute('aria-label') === 'Span',
   );

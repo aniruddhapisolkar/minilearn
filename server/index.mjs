@@ -30,6 +30,16 @@ const assets = new Map([
   ['/app.js', ['web/app.js', 'text/javascript; charset=utf-8']],
   ['/graph.js', ['web/graph.js', 'text/javascript; charset=utf-8']],
   ['/styles.css', ['web/styles.css', 'text/css; charset=utf-8']],
+  ...[
+    'jetbrains-mono-latin-wght-normal.woff2',
+    'jetbrains-mono-latin-wght-italic.woff2',
+    'source-sans-3-latin-wght-normal.woff2',
+    'source-sans-3-latin-wght-italic.woff2',
+    'cmu-serif-bold.ttf',
+  ].map((name) => [
+    `/fonts/${name}`,
+    [`web/fonts/${name}`, name.endsWith('.ttf') ? 'font/ttf' : 'font/woff2'],
+  ]),
   [
     '/vendor/marked.js',
     ['node_modules/marked/lib/marked.esm.js', 'text/javascript; charset=utf-8'],

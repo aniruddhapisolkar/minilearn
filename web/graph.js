@@ -1,12 +1,13 @@
 const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
-const width = 208,
-  height = 56,
-  hgap = 78,
-  vgap = 34;
+const width = 184,
+  height = 68,
+  hgap = 56,
+  vgap = 44;
+const nodeY = 20;
 
 export function graphMarkup(project, state, { e, icon, button, pageHeader }) {
   const lessons = project.curriculum.flatMap((m) => m.lessons);
-  return `<main class="page wide">${pageHeader('Knowledge map', 'A quiet view of the concepts you have demonstrated, and how they depend on one another.', project.graph.nodes.length ? button('Clear map', 'clear-graph', { style: 'ghost', i: 'trash' }) : '')}<div class="graph-shell"><div class="graph-toolbar"><input class="input" id="graph-search" type="search" aria-label="Search knowledge" placeholder="Search concepts…" value="${e(state.query)}"><select id="graph-lesson" aria-label="Filter by lesson"><option value="">All lessons</option>${lessons.map((l) => `<option value="${e(l.id)}" ${state.lesson === l.id ? 'selected' : ''}>${e(l.title)}</option>`).join('')}</select><span class="spacer"></span><div class="row" id="graph-zoom-controls"><button class="icon-button" data-graph="zoom-out" title="Zoom out" aria-label="Zoom out">${icon('minus')}</button><span id="graph-zoom-level" class="small muted mono">100%</span><button class="icon-button" data-graph="zoom-in" title="Zoom in" aria-label="Zoom in">${icon('plus')}</button><button class="button minor ghost graph-fit" data-graph="fit" title="Fit the graph to view">${icon('fit')} Fit</button></div><button class="button minor" id="graph-view-switch" data-graph="toggle-view">${icon(state.view === 'list' ? 'graph' : 'list')} ${state.view === 'list' ? 'Graph' : 'List'}</button></div><div id="graph-body"></div><div id="graph-details"></div></div><div class="graph-stat" id="graph-stat"></div><p class="small muted">Drag the canvas to pan. Scroll to zoom. Select a concept to inspect its statement and related concepts.</p></main>`;
+  return `<main class="page wide graph-page">${pageHeader('Knowledge map', 'Concepts you have demonstrated and their dependencies.', project.graph.nodes.length ? button('Clear map', 'clear-graph', { style: 'ghost', i: 'trash' }) : '')}<div class="graph-shell"><div class="graph-toolbar"><input class="input" id="graph-search" type="search" aria-label="Search knowledge" placeholder="Search nodes…" value="${e(state.query)}"><select id="graph-lesson" aria-label="Filter by lesson"><option value="">All lessons</option>${lessons.map((l) => `<option value="${e(l.id)}" ${state.lesson === l.id ? 'selected' : ''}>${e(l.title)}</option>`).join('')}</select><span class="spacer"></span><div class="row" id="graph-zoom-controls"><button class="icon-button" data-graph="zoom-out" title="Zoom out" aria-label="Zoom out">${icon('minus')}</button><span id="graph-zoom-level" class="small muted mono">100%</span><button class="icon-button" data-graph="zoom-in" title="Zoom in" aria-label="Zoom in">${icon('plus')}</button><button class="button minor ghost graph-fit" data-graph="fit" title="Fit the graph to view">${icon('fit')} Fit</button></div><button class="button minor" id="graph-view-switch" data-graph="toggle-view">${icon(state.view === 'list' ? 'graph' : 'list')} ${state.view === 'list' ? 'Graph' : 'List'}</button></div><div id="graph-body"></div><div id="graph-details"></div></div><div class="graph-stat" id="graph-stat"></div><p class="small muted">Drag to pan · Scroll to zoom · Select a concept to inspect</p></main>`;
 }
 
 function layout(nodes, edges) {
@@ -188,7 +189,7 @@ export function mountGraph(project, state, { e, icon, button, ib, onDelete }) {
           if (svg && currentLayout.positions.has(target.id)) {
             const p = currentLayout.positions.get(target.id);
             state.x = svg.clientWidth / 2 - (p.x + width / 2) * state.zoom;
-            state.y = svg.clientHeight / 2 - (p.y + height / 2) * state.zoom;
+            state.y = svg.clientHeight / 2 - (p.y + nodeY) * state.zoom;
             updateTransform();
           }
         }),
@@ -221,22 +222,24 @@ export function mountGraph(project, state, { e, icon, button, ib, onDelete }) {
     }
     currentLayout = layout(nodes, edges);
     const pos = currentLayout.positions;
-    body.innerHTML = `<svg class="graph-canvas" id="graph-canvas" role="img" aria-label="Interactive knowledge map"><defs><marker id="graph-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0 0L6 3L0 6" fill="#a8b6a6"/></marker></defs><g id="graph-world">${edges
+    body.innerHTML = `<svg class="graph-canvas" id="graph-canvas" role="group" aria-label="Interactive knowledge map"><defs><marker id="graph-arrow" markerWidth="7" markerHeight="7" refX="6" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0 0L6 3L0 6" class="graph-arrow"/></marker></defs><g id="graph-world">${edges
       .map((edge) => {
         const a = pos.get(edge.from),
           b = pos.get(edge.to),
-          x = a.x + width,
-          y = a.y + height / 2,
-          x2 = b.x,
-          y2 = b.y + height / 2,
-          mid = (x + x2) / 2;
-        return `<path class="graph-edge" d="M${x} ${y} C${mid} ${y},${mid} ${y2},${x2 - 3} ${y2}" marker-end="url(#graph-arrow)"/>`;
+          x = a.x + width / 2,
+          y = a.y + nodeY,
+          x2 = b.x + width / 2,
+          y2 = b.y + nodeY,
+          length = Math.hypot(x2 - x, y2 - y) || 1,
+          dx = (x2 - x) / length,
+          dy = (y2 - y) / length;
+        return `<path class="graph-edge" d="M${x + dx * 5} ${y + dy * 5} L${x2 - dx * 7} ${y2 - dy * 7}" marker-end="url(#graph-arrow)"/>`;
       })
       .join('')}${nodes
       .map((n) => {
         const p = pos.get(n.id),
           lines = wrapTitle(n.title);
-        return `<g class="graph-node ${state.selected === n.id ? 'selected' : ''}" data-node-id="${e(n.id)}" transform="translate(${p.x} ${p.y})" tabindex="0" role="button" aria-label="${e(n.title)}"><title>${e(n.title)}</title><rect width="${width}" height="${height}"/><text x="12" y="${lines.length === 1 ? 32 : 24}">${lines.map((line, i) => `<tspan x="12" dy="${i ? 17 : 0}">${e(line)}</tspan>`).join('')}</text></g>`;
+        return `<g class="graph-node ${state.selected === n.id ? 'selected' : ''}" data-node-id="${e(n.id)}" transform="translate(${p.x} ${p.y})" tabindex="0" role="button" aria-label="${e(n.title)}"><title>${e(n.title)}</title><rect class="graph-hit" width="${width}" height="${height}"/><circle class="graph-dot" cx="${width / 2}" cy="${nodeY}" r="4"/><text x="${width / 2}" y="${nodeY + 18}" text-anchor="middle">${lines.map((line, i) => `<tspan x="${width / 2}" dy="${i ? 14 : 0}">${e(line)}</tspan>`).join('')}</text></g>`;
       })
       .join('')}</g></svg>`;
     svg = $('#graph-canvas');

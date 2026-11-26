@@ -73,6 +73,6 @@ npm test      # storage, import/export, and provider/tutor API tests
 npm run check # syntax checks
 ```
 
-The app consists of a small Node HTTP server (`server/`) and a static browser UI (`web/`). Provider requests run server-side. Markdown is sanitized before rendering, and KaTeX renders mathematical notation locally. The runtime has no Electron, plugin system, desktop subscription integration, or external frontend service.
+The app consists of a small Node HTTP server (`server/`) and a static browser UI (`web/`). Its appearance retains LearnHarness's dark palette, JetBrains Mono interface, Source Sans 3 reading text, and CMU Serif titles. The fonts are bundled locally with their open font licenses in `web/fonts/`; no font service or additional runtime dependency is needed. Provider requests run server-side. Markdown is sanitized before rendering, and KaTeX renders mathematical notation locally. The runtime has no Electron, plugin system, desktop subscription integration, or external frontend service.
 
 The original LearnHarness teaching and practice doctrine files are retained in `src/agent/prompts/` and adapted to the minilearn tutor's provider-neutral conversational contract.
