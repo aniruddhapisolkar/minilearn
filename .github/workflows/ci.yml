@@ -2,6 +2,9 @@ name: Check minilearn
 on:
   push:
   pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -14,3 +17,48 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+  release:
+    name: Publish minilearn.zip
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: minilearn-release-${{ github.repository }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Package the tested commit
+        run: bash scripts/package-release.sh "$RUNNER_TEMP/minilearn.zip" "$GITHUB_SHA"
+      - name: Publish the latest tested main build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo "A newer commit is on main; skipping this older build."
+            exit 0
+          fi
+          tag="build-$GITHUB_SHA"
+          archive="$RUNNER_TEMP/minilearn.zip"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            # A retry can finish a draft or missing upload without replacing
+            # the contents of a previously published release.
+            if [[ "$(gh release view "$tag" --json assets --jq '[.assets[] | select(.name == "minilearn.zip")] | length')" == 0 ]]; then
+              gh release upload "$tag" "$archive"
+            fi
+            if [[ "$(gh release view "$tag" --json isDraft --jq '.isDraft')" == true ]]; then
+              gh release edit "$tag" --draft=false --latest
+            fi
+          else
+            gh release create "$tag" "$archive" --target "$GITHUB_SHA" \
+              --title "minilearn (${GITHUB_SHA:0:7})" \
+              --notes "Tested main build. Download minilearn.zip, extract it, and run npm start inside minilearn. Commit: $GITHUB_SHA." \
+              --latest
+          fi

@@ -6,6 +6,8 @@ minilearn is derived from [LearnHarness](https://github.com/amosblomqvist/learnh
 
 ## Get started
 
+**[Download minilearn.zip](https://github.com/aniruddhapisolkar/minilearn/releases/latest/download/minilearn.zip)** — the latest tested release, automatically published when `main` passes its checks. The ZIP extracts to a folder named `minilearn`.
+
 Install [Node.js](https://nodejs.org/) 22 or later, open a terminal in the extracted minilearn folder, and run:
 
 ```sh
