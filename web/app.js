@@ -57,6 +57,8 @@ const icons = {
   fit: '<path d="M4 9V4h5m6 0h5v5m0 6v5h-5m-6 0H4v-5"/>',
   list: '<path d="M8 5h12M8 12h12M8 19h12M4 5h.1M4 12h.1M4 19h.1"/>',
   search: '<circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/>',
+  globe:
+    '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
   reset: '<path d="M20 11a8 8 0 1 0-2 6M20 4v7h-7"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7h.01"/>',
   arrow: '<path d="M4 12h16m-6-6 6 6-6 6"/>',
@@ -97,6 +99,7 @@ const state = {
   sessionFilter: 'learn',
   homeDraft: '',
   homeMode: 'learn',
+  webSearch: false,
   planVisible: false,
   answerChoice: '',
   confidence: 50,
@@ -175,7 +178,7 @@ const statusLabel = (status) =>
       : 'Not started';
 const statusDot = (status) =>
   `<span class="lesson-status ${status === 'complete' ? 'complete' : status === 'started' ? 'started' : ''}" title="${statusLabel(status)}"></span>`;
-const markdown = (raw) => {
+const markdown = (raw, sources = []) => {
   const expressions = [];
   const safeRaw = String(raw).replace(
     /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\((.+?)\\\)|(?<!\\)\$([^$\n]+?)\$/g,
@@ -252,6 +255,37 @@ const markdown = (raw) => {
     }
     fragment.append(node.textContent.slice(offset));
     node.replaceWith(fragment);
+  }
+  if (sources.length) {
+    const citations = document.createTreeWalker(
+      template.content,
+      NodeFilter.SHOW_TEXT,
+    );
+    const textNodes = [];
+    while (citations.nextNode()) textNodes.push(citations.currentNode);
+    for (const node of textNodes) {
+      if (node.parentElement?.closest('a,pre,code,.katex')) continue;
+      const matches = [...node.textContent.matchAll(/\[([1-5])\]/g)];
+      if (!matches.length) continue;
+      const fragment = document.createDocumentFragment();
+      let offset = 0;
+      for (const match of matches) {
+        fragment.append(node.textContent.slice(offset, match.index));
+        const url = safeSourceURL(sources[Number(match[1]) - 1]?.url);
+        if (url) {
+          const link = document.createElement('a');
+          link.className = 'web-citation';
+          link.href = url;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = match[0];
+          fragment.append(link);
+        } else fragment.append(match[0]);
+        offset = match.index + match[0].length;
+      }
+      fragment.append(node.textContent.slice(offset));
+      node.replaceWith(fragment);
+    }
   }
   return template.innerHTML;
 };
@@ -603,6 +637,9 @@ function dockSetup() {
     ? ''
     : button('Add a provider key', 'add-model', { style: 'setup-key' });
 }
+function webSearchToggle() {
+  return `<button type="button" class="web-search-toggle ${state.webSearch ? 'active' : ''}" data-action="toggle-web-search" aria-pressed="${state.webSearch}" title="Optional web search. Only model-generated search queries go to Exa or Purili; results go to your model. No search key needed." ${state.busy ? 'disabled' : ''}>${icon('globe')} Web search</button>`;
+}
 function homeDock(switchMode = true) {
   const practice = state.homeMode === 'practice';
   const pick =
@@ -615,7 +652,7 @@ function homeDock(switchMode = true) {
           { style: 'pick-nodes', i: 'dumbbell' },
         )
       : '';
-  return `<div class="home-dock"><div class="dock-inner"><div class="dock-actions">${pick}${dockSetup()}</div><form id="home-form" class="opening-composer" data-drop-composer><textarea name="topic" aria-label="${practice ? 'What do you want to practice?' : 'What do you want to learn?'}" placeholder="${practice ? 'What do you want to practice?' : 'What do you want to learn?'}" rows="1">${e(state.homeDraft)}</textarea>${ib('paperclip', 'choose-materials', 'Attach files', {}, 'composer-attach')}<button type="submit" class="send-square" aria-label="Start session" ${!state.homeDraft.trim() && !state.practiceNodes.length ? 'disabled' : ''}>${icon('enter')}</button></form><div class="dock-stats">${switchMode ? modeSwitch(state.homeMode) : ''}<span class="spacer"></span>${state.selectedMaterials.length ? `<span class="dock-source-count">${state.selectedMaterials.length} sources</span>` : ''}${modelPill()}</div></div></div>`;
+  return `<div class="home-dock"><div class="dock-inner"><div class="dock-actions">${pick}${dockSetup()}</div><form id="home-form" class="opening-composer" data-drop-composer><textarea name="topic" aria-label="${practice ? 'What do you want to practice?' : 'What do you want to learn?'}" placeholder="${practice ? 'What do you want to practice?' : 'What do you want to learn?'}" rows="1">${e(state.homeDraft)}</textarea>${ib('paperclip', 'choose-materials', 'Attach files', {}, 'composer-attach')}<button type="submit" class="send-square" aria-label="Start session" ${!state.homeDraft.trim() && !state.practiceNodes.length ? 'disabled' : ''}>${icon('enter')}</button></form><div class="dock-stats">${switchMode ? modeSwitch(state.homeMode) : ''}<span class="spacer"></span>${state.selectedMaterials.length ? `<span class="dock-source-count">${state.selectedMaterials.length} sources</span>` : ''}${webSearchToggle()}${modelPill()}</div></div></div>`;
 }
 const emptyGraphProject = { curriculum: [], graph: { nodes: [], edges: [] } };
 function renderHome() {
@@ -629,10 +666,36 @@ function renderCurriculum() {
   const p = state.project;
   return `<main class="page"><div class="page-head"><h1>Curriculum</h1><p>Your plan is always yours to edit. Add, move, or refine any lesson.</p><div class="row wrap" style="margin-top:18px">${button('Add module', 'add-module', { style: 'primary', i: 'plus' })}${button('Paste outline', 'paste-outline', { i: 'file' })}${button('Plan with AI', 'go', { i: 'spark', data: { 'data-view': 'planner' } })}</div></div>${p.curriculum.length ? p.curriculum.map((m, i) => `<section class="module-card"><div class="module-card-header"><span class="module-number">${String(i + 1).padStart(2, '0')}</span><div class="grow"><h3>${e(m.title)}</h3>${m.description ? `<div class="module-desc">${e(m.description)}</div>` : ''}</div><div class="controls">${i > 0 ? ib('up', 'move-module', 'Move module up', { 'data-id': m.id, 'data-direction': '-1' }) : ''}${i < p.curriculum.length - 1 ? ib('down', 'move-module', 'Move module down', { 'data-id': m.id, 'data-direction': '1' }) : ''}${ib('edit', 'edit-module', 'Edit module', { 'data-id': m.id })}${ib('trash', 'delete-module', 'Delete module', { 'data-id': m.id }, 'danger')}</div></div><div class="module-lessons">${m.lessons.map((l, j) => `<div class="edit-lesson">${statusDot(p.progress[l.id])}<div class="grow"><div class="title">${e(l.title)}</div>${l.description ? `<small>${e(l.description)}</small>` : ''}</div><div class="controls">${ib('plus', 'add-lesson', 'Insert lesson after this one', { 'data-module': m.id, 'data-after': l.id })}${j > 0 ? ib('up', 'move-lesson', 'Move lesson up', { 'data-module': m.id, 'data-id': l.id, 'data-direction': '-1' }) : ''}${j < m.lessons.length - 1 ? ib('down', 'move-lesson', 'Move lesson down', { 'data-module': m.id, 'data-id': l.id, 'data-direction': '1' }) : ''}${ib('edit', 'edit-lesson', 'Edit or move lesson', { 'data-module': m.id, 'data-id': l.id })}${ib('trash', 'delete-lesson', 'Delete lesson', { 'data-module': m.id, 'data-id': l.id }, 'danger')}</div></div>`).join('')}<button class="add-inline" data-action="add-lesson" data-module="${e(m.id)}">${icon('plus')} Add lesson</button></div></section>`).join('') : empty('book', 'Start from scratch', 'You can build the outline manually or turn your own text into a curriculum.', button('Add module', 'add-module', { style: 'primary', i: 'plus' }) + button('Paste outline', 'paste-outline', { i: 'file' }))}</main>`;
 }
+function safeSourceURL(value) {
+  try {
+    const url = new URL(value);
+    return ['https:', 'http:'].includes(url.protocol) &&
+      !url.username &&
+      !url.password
+      ? url.href
+      : '';
+  } catch {
+    return '';
+  }
+}
+function webSearchSources(search) {
+  if (!search) return '';
+  if (search.status !== 'ok')
+    return `<div class="web-search-note">${icon('globe')} ${search.status === 'no-results' ? 'Web search found no results.' : 'Web search temporarily unavailable.'} No web verification.</div>`;
+  const items = Array.isArray(search.sources) ? search.sources : [];
+  return `<details class="web-sources"><summary>${icon('globe')} ${items.length} web source${items.length === 1 ? '' : 's'} · ${e(search.provider)}</summary><div class="web-search-query">${e(search.query)}</div><ol>${items
+    .map((source) => {
+      const url = safeSourceURL(source?.url);
+      return url
+        ? `<li><a href="${e(url)}" target="_blank" rel="noopener noreferrer">${e(source.title || url)}</a><span class="web-source-host">${e(new URL(url).hostname)}</span></li>`
+        : '<li>Invalid source URL</li>';
+    })
+    .join('')}</ol></details>`;
+}
 function messageHTML(m, { save = false, showQuestion = true } = {}) {
   return m.role === 'user'
     ? `<article class="message user"><div class="user-bubble">${e(m.content)}</div></article>`
-    : `<article class="message assistant">${m.content ? `<div class="markdown">${markdown(m.content)}</div>` : ''}${showQuestion && m.question ? `<div class="past-question"><span class="caps">${e(questionLabel(m.question.kind))}</span><div class="markdown">${markdown(m.question.prompt)}</div>${m.question.options.length ? `<ol class="past-options">${m.question.options.map((option) => `<li>${markdown(option)}</li>`).join('')}</ol>` : ''}</div>` : ''}${save ? `<div class="message-actions">${m.content ? button('Save as study note', 'save-message', { i: 'note', style: 'minor', data: { 'data-id': m.id } }) : ''}${ib('trash', 'delete-exchange', 'Delete this exchange', { 'data-id': m.id }, 'danger')}</div>` : ''}</article>`;
+    : `<article class="message assistant">${m.content ? `<div class="markdown">${markdown(m.content, m.webSearch?.sources || [])}</div>` : ''}${webSearchSources(m.webSearch)}${showQuestion && m.question ? `<div class="past-question"><span class="caps">${e(questionLabel(m.question.kind))}</span><div class="markdown">${markdown(m.question.prompt)}</div>${m.question.options.length ? `<ol class="past-options">${m.question.options.map((option) => `<li>${markdown(option)}</li>`).join('')}</ol>` : ''}</div>` : ''}${save ? `<div class="message-actions">${m.content ? button('Save as study note', 'save-message', { i: 'note', style: 'minor', data: { 'data-id': m.id } }) : ''}${ib('trash', 'delete-exchange', 'Delete this exchange', { 'data-id': m.id }, 'danger')}</div>` : ''}</article>`;
 }
 function proposalList(curriculum) {
   return `<ul class="proposal-list">${curriculum.map((m) => `<li><strong>${e(m.title)}</strong><ol>${m.lessons.map((l) => `<li>${e(l.title)}</li>`).join('')}</ol></li>`).join('')}</ul>`;
@@ -694,7 +757,7 @@ function proposalChanges(proposal, current) {
 function renderPlanner() {
   const planner = state.project.planner,
     working = state.busy?.kind === 'planner';
-  return `<main class="page wide"><div class="page-head"><h1>Plan with AI</h1><p>Talk through your curriculum. Nothing changes until you apply a proposal.</p><div class="row wrap" style="margin-top:14px">${button('Back to editor', 'go', { i: 'back', data: { 'data-view': 'curriculum' } })}${planner.messages.length ? button('Clear conversation', 'clear-planner', { style: 'ghost', i: 'trash' }) : ''}</div></div><div class="planner-grid"><div><div class="planner-messages">${planner.messages.length ? planner.messages.map((m) => messageHTML(m)).join('') : `<div class="card"><h3>What would you like to learn?</h3><p class="muted">Paste a full syllabus, describe a subject and your goals, or ask for a specific change — for example, “Add spectral decomposition after eigenvectors in Module 5.”</p></div>`}${working ? `<div class="thinking"><span class="spinner"></span>Working on your curriculum…</div>` : ''}</div><form id="planner-form" class="planner-composer"><textarea name="message" aria-label="Message to curriculum planner" placeholder="Describe your curriculum or a change…" ${working ? 'disabled' : ''}>${e(state.plannerDraft)}</textarea><div class="row" style="justify-content:flex-end">${working ? button('Stop', 'stop', { i: 'stop' }) : `${button('Paste outline', 'paste-outline', { style: 'ghost', i: 'file' })}<button class="button primary" type="submit">${icon('send')} Send</button>`}</div></form></div><aside class="card planner-preview"><div class="between"><h3>${planner.proposal ? 'Proposed curriculum' : 'Current curriculum'}</h3><span class="tag ${planner.proposal ? 'complete' : ''}">${planner.proposal ? 'Review' : 'Saved'}</span></div>${planner.proposal ? proposalChanges(planner.proposal, state.project.curriculum) : ''}${(planner.proposal || state.project.curriculum).length ? proposalList(planner.proposal || state.project.curriculum) : '<p class="small muted">Your curriculum is empty.</p>'}${planner.proposal ? `<div class="notice small">Review the full outline before applying. Your existing lesson sessions and progress follow their stable IDs.</div><div class="row wrap" style="margin-top:12px">${button('Apply proposal', 'apply-proposal', { style: 'primary', i: 'check' })}${button('Discard', 'discard-proposal', { style: 'ghost' })}</div>` : ''}</aside></div></main>`;
+  return `<main class="page wide"><div class="page-head"><h1>Plan with AI</h1><p>Talk through your curriculum. Nothing changes until you apply a proposal.</p><div class="row wrap" style="margin-top:14px">${button('Back to editor', 'go', { i: 'back', data: { 'data-view': 'curriculum' } })}${planner.messages.length ? button('Clear conversation', 'clear-planner', { style: 'ghost', i: 'trash' }) : ''}</div></div><div class="planner-grid"><div><div class="planner-messages">${planner.messages.length ? planner.messages.map((m) => messageHTML(m)).join('') : `<div class="card"><h3>What would you like to learn?</h3><p class="muted">Paste a full syllabus, describe a subject and your goals, or ask for a specific change — for example, “Add spectral decomposition after eigenvectors in Module 5.”</p></div>`}${working ? `<div class="thinking"><span class="spinner"></span>Working on your curriculum…</div>` : ''}</div><form id="planner-form" class="planner-composer"><textarea name="message" aria-label="Message to curriculum planner" placeholder="Describe your curriculum or a change…" ${working ? 'disabled' : ''}>${e(state.plannerDraft)}</textarea><div class="row" style="justify-content:flex-end">${working ? button('Stop', 'stop', { i: 'stop' }) : `${webSearchToggle()}${button('Paste outline', 'paste-outline', { style: 'ghost', i: 'file' })}<button class="button primary" type="submit">${icon('send')} Send</button>`}</div></form></div><aside class="card planner-preview"><div class="between"><h3>${planner.proposal ? 'Proposed curriculum' : 'Current curriculum'}</h3><span class="tag ${planner.proposal ? 'complete' : ''}">${planner.proposal ? 'Review' : 'Saved'}</span></div>${planner.proposal ? proposalChanges(planner.proposal, state.project.curriculum) : ''}${(planner.proposal || state.project.curriculum).length ? proposalList(planner.proposal || state.project.curriculum) : '<p class="small muted">Your curriculum is empty.</p>'}${planner.proposal ? `<div class="notice small">Review the full outline before applying. Your existing lesson sessions and progress follow their stable IDs.</div><div class="row wrap" style="margin-top:12px">${button('Apply proposal', 'apply-proposal', { style: 'primary', i: 'check' })}${button('Discard', 'discard-proposal', { style: 'ghost' })}</div>` : ''}</aside></div></main>`;
 }
 const questionLabel = (kind) =>
   ({
@@ -715,7 +778,7 @@ function renderPlanPanel() {
 }
 function answerDock(working) {
   const question = activeQuestion();
-  const footer = `<div class="dock-stats"><span class="dock-source-count">${state.selectedMaterials.length ? `${state.selectedMaterials.length} sources` : ''}</span><span class="spacer"></span>${modelPill()}</div>`;
+  const footer = `<div class="dock-stats"><span class="dock-source-count">${state.selectedMaterials.length ? `${state.selectedMaterials.length} sources` : ''}</span><span class="spacer"></span>${webSearchToggle()}${modelPill()}</div>`;
   if (!question)
     return `<div class="session-dock"><div class="dock-inner"><div class="dock-actions">${dockSetup()}</div><form id="lesson-form" class="opening-composer" data-drop-composer><textarea name="message" id="lesson-message" aria-label="Your message" placeholder="${state.session?.messages.length ? 'Ask a question or explain your thinking…' : state.mode === 'learn' ? 'What do you want to learn?' : 'What do you want to practice?'}" rows="1" ${working ? 'disabled' : ''}>${e(state.draft)}</textarea>${ib('paperclip', 'choose-materials', 'Attach files', {}, 'composer-attach')}${working ? `<button type="button" class="send-square stop-square" data-action="stop" aria-label="Stop">${icon('stop')}</button>` : `<button class="send-square" type="submit" aria-label="Submit message" ${!state.draft.trim() ? 'disabled' : ''}>${icon('enter')}</button>`}</form>${footer}</div></div>`;
   const hasChoices = question.options.length > 0;
@@ -785,9 +848,12 @@ function render() {
     }
   root.innerHTML = `<div class="app-shell ${state.collapsed ? 'collapsed' : ''}">${renderSidebar()}<div class="main-panel ${home || draft ? 'canvas-panel' : ''}">${home || draft ? '' : topbar()}${content}</div></div>`;
   $('.main-panel').dataset.viewKey = viewKey;
-  if (transcriptScroll != null && $('#messages')) $('#messages').scrollTop = transcriptScroll;
-  if (pageScroll != null && $('.main-panel > .page')) $('.main-panel > .page').scrollTop = pageScroll;
-  if (sidebarScroll != null && $('.session-list')) $('.session-list').scrollTop = sidebarScroll;
+  if (transcriptScroll != null && $('#messages'))
+    $('#messages').scrollTop = transcriptScroll;
+  if (pageScroll != null && $('.main-panel > .page'))
+    $('.main-panel > .page').scrollTop = pageScroll;
+  if (sidebarScroll != null && $('.session-list'))
+    $('.session-list').scrollTop = sidebarScroll;
   if (home)
     mountGraph(state.project || emptyGraphProject, state.graph, {
       e,
@@ -988,7 +1054,10 @@ function modelSetup(existing = null) {
     ['opencode', 'OpenCode (pay-as-you-go)'],
     ['custom', 'OpenAI-compatible / local model'],
   ]
-    .map(([id, name]) => `<option value="${id}" ${provider === id ? 'selected' : ''}>${name}</option>`)
+    .map(
+      ([id, name]) =>
+        `<option value="${id}" ${provider === id ? 'selected' : ''}>${name}</option>`,
+    )
     .join('');
   showSettings(
     `<h3 class="settings-section-title">Providers</h3><div class="settings-section-label">${existing ? 'Edit provider' : 'Add a provider'}</div><form id="connection-form"><label class="field">Provider<select name="provider" id="provider-select" ${existing ? 'disabled' : ''}>${options}</select></label><div id="custom-fields" class="${provider === 'custom' ? '' : 'hidden'}">${field('API base URL', 'baseUrl', existing?.baseUrl || 'http://localhost:11434/v1', 'http://localhost:11434/v1')}<div class="provider-presets" style="margin-top:-9px;margin-bottom:15px"><button type="button" data-preset="http://localhost:11434/v1">Ollama</button><button type="button" data-preset="http://localhost:1234/v1">LM Studio</button><button type="button" data-preset="http://localhost:8080/v1">llama.cpp</button></div></div><label class="field"><span id="key-label">API key${provider === 'custom' ? ' (optional)' : ''}</span><input class="input" type="password" name="apiKey" autocomplete="off" placeholder="${existing?.hasKey ? 'Leave blank to keep existing key' : 'Paste your API key'}"><span class="hint" id="key-hint">${keyHint(provider)}</span></label><label class="field">Model<div class="row"><input class="input grow" name="model" list="model-options" value="${e(existing?.model || '')}" placeholder="Choose or type model ID" required><button class="button" type="button" id="discover-models">Find models</button></div><datalist id="model-options"></datalist><span id="discovery-hint" class="hint">Use Find models to list available models, or enter an ID manually.</span></label><label class="field">Connection name (optional)<input class="input" name="label" value="${e(existing?.label || '')}" placeholder="e.g. Local Ollama"></label><div id="connect-error" class="error hidden"></div><div class="row" style="justify-content:flex-end"><button type="button" class="button ghost" id="back-models">Back</button><button type="submit" class="button primary">${icon('check')} Test &amp; connect</button></div><p class="small muted" style="margin:9px 0 0;text-align:right">Tests with a tiny model request (your provider's normal billing applies).</p></form>`,
@@ -1465,7 +1534,11 @@ async function turn(message, draftText = message) {
   try {
     state.session = await api(purl(`/sessions/${state.session.id}/turn`), {
       method: 'POST',
-      data: { message, materialIds: state.selectedMaterials },
+      data: {
+        message,
+        materialIds: state.selectedMaterials,
+        webSearch: state.webSearch,
+      },
       signal: controller.signal,
     });
     await refreshProject();
@@ -1495,7 +1568,7 @@ async function plan(message) {
   try {
     state.project.planner = await api(purl('/planner'), {
       method: 'POST',
-      data: { message },
+      data: { message, webSearch: state.webSearch },
       signal: controller.signal,
     });
     await refreshProject();
@@ -1730,6 +1803,15 @@ document.addEventListener('click', async (event) => {
     switch (action) {
       case 'close-dialog':
         closeDialog();
+        break;
+      case 'toggle-web-search':
+        if (!state.busy) {
+          state.webSearch = !state.webSearch;
+          for (const toggle of $$('[data-action="toggle-web-search"]')) {
+            toggle.classList.toggle('active', state.webSearch);
+            toggle.setAttribute('aria-pressed', String(state.webSearch));
+          }
+        }
         break;
       case 'library':
       case 'projects':
@@ -2053,7 +2135,19 @@ document.addEventListener('click', async (event) => {
         break;
       case 'save-message': {
         const m = state.session?.messages.find((v) => v.id === id);
-        if (m) noteDialog(null, m.content);
+        if (m) {
+          const links = (m.webSearch?.sources || [])
+            .map((source, i) => {
+              const url = safeSourceURL(source?.url);
+              return url ? `${i + 1}. <${url}>` : '';
+            })
+            .filter(Boolean);
+          noteDialog(
+            null,
+            m.content +
+              (links.length ? '\n\nSources:\n' + links.join('\n') : ''),
+          );
+        }
         break;
       }
       case 'view-note': {

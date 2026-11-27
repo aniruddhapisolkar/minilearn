@@ -49,6 +49,8 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
       last = data.messages.at(-1).content;
     let answer;
     if (system.includes('testing a connection')) answer = 'OK';
+    else if (system.includes('WEB SEARCH (enabled'))
+      answer = JSON.stringify({ web_search: 'vector spaces textbook' });
     else if (system.includes('author a curriculum'))
       answer = JSON.stringify({
         reply: 'I added a topic.',
@@ -88,7 +90,8 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     else
       answer = JSON.stringify({
         reply:
-          'Let’s begin with the vectors you already know.\n\n$$a\\mathbf{v}+b\\mathbf{w}$$',
+          'Let’s begin with the vectors you already know.\n\n$$a\\mathbf{v}+b\\mathbf{w}$$' +
+          (system.includes('WEB SEARCH RESULT') ? '\n\nSee [1].' : ''),
         question: {
           kind: 'prediction',
           prompt: 'What does it mean to span a vector space?',
@@ -164,13 +167,41 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     w.HTMLDialogElement.prototype.close = function () {
       this.removeAttribute('open');
     };
-  globalThis.fetch = (target, options) =>
-    nativeFetch(
+  let searches = 0;
+  globalThis.fetch = async (target, options) => {
+    if (target === 'https://mcp.exa.ai/mcp') {
+      const rpc = JSON.parse(options.body);
+      if (rpc.method === 'initialize')
+        return Response.json({
+          id: rpc.id,
+          result: { protocolVersion: '2025-11-25' },
+        });
+      if (rpc.method === 'notifications/initialized')
+        return new Response(null, { status: 202 });
+      assert.equal(rpc.method, 'tools/call');
+      searches++;
+      return Response.json({
+        id: rpc.id,
+        result: {
+          structuredContent: {
+            results: [
+              {
+                title: 'Vector spaces',
+                url: 'https://example.org/textbook',
+                highlights: ['A study resource'],
+              },
+            ],
+          },
+        },
+      });
+    }
+    return nativeFetch(
       typeof target === 'string' && target.startsWith('/')
         ? url + target
         : target,
       options,
     );
+  };
   const $ = (s) => document.querySelector(s),
     $$ = (s) => [...document.querySelectorAll(s)];
   const click = (selector) => {
@@ -227,6 +258,10 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   assert.ok($('.sidebar') && $('#home-form') && !$('.topbar'));
   assert.equal($$('.sidebar [data-action="new-project"]').length, 1);
   assert.equal($('.session-search-row .icon-button'), null);
+  assert.equal(
+    $('[data-action="toggle-web-search"]').getAttribute('aria-pressed'),
+    'false',
+  );
   click('[data-action="model-picker"]');
   assert.ok($('.model-picker-empty').textContent.includes('No models match'));
   click('[data-action="home"]');
@@ -289,6 +324,11 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   assert.equal($('.window-title').textContent, 'Span');
   assert.ok($('.opening-composer'));
   assert.ok($('.model-pill').textContent.includes('local-test'));
+  click('[data-action="toggle-web-search"]');
+  assert.equal(
+    $('[data-action="toggle-web-search"]').getAttribute('aria-pressed'),
+    'true',
+  );
   click('[data-action="begin-session"]');
   await wait(
     () =>
@@ -298,6 +338,12 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     'first tutor turn',
   );
   assert.ok($('.katex'), 'math rendered');
+  assert.equal(searches, 1);
+  assert.equal($('.web-sources a').href, 'https://example.org/textbook');
+  assert.equal($('.web-sources a').textContent, 'Vector spaces');
+  assert.equal($('.web-citation').href, 'https://example.org/textbook');
+  assert.equal($('.web-citation').textContent, '[1]');
+  click('[data-action="toggle-web-search"]');
   assert.ok($('.question-dock'));
   assert.equal($$('.quiz-option').length, 4);
   click('input[name="choice"][value="1"]');
@@ -310,6 +356,7 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
     'second tutor turn',
   );
   assert.ok($('.past-question'));
+  assert.equal(searches, 1, 'no web request when search is off');
   click('[data-action="toggle-plan"]');
   assert.ok($('.session-plan'));
   click('[data-action="toggle-plan"]');
@@ -338,9 +385,13 @@ test('browser workflow: outline, quick model setup, tutor, map, AI insert, and d
   assert.ok($('#graph-canvas'));
   click('[data-view="curriculum"]');
   click('[data-view="planner"]');
+  click('[data-action="toggle-web-search"]');
   fill('#planner-form textarea', 'Add linear independence after span.');
   submit('#planner-form');
   await wait(() => $('[data-action="apply-proposal"]'), 'planner proposal');
+  assert.equal(searches, 2);
+  assert.ok($('.web-sources a'));
+  click('[data-action="toggle-web-search"]');
   click('[data-action="apply-proposal"]');
   await wait(
     () =>

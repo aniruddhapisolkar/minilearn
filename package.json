@@ -13,7 +13,7 @@
     "start": "node server/index.mjs",
     "dev": "node --watch server/index.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check server/bootstrap.mjs && node --check server/index.mjs && node --check server/storage.mjs && node --check server/models.mjs && node --check server/tutor.mjs && node --check web/app.js && node --check web/graph.js"
+    "check": "node --check server/bootstrap.mjs && node --check server/index.mjs && node --check server/storage.mjs && node --check server/models.mjs && node --check server/search.mjs && node --check server/tutor.mjs && node --check web/app.js && node --check web/graph.js"
   },
   "dependencies": {
     "dompurify": "^3.3.0",

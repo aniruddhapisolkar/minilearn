@@ -265,7 +265,9 @@ export function createApp({ storage = new Storage() } = {}) {
         return json(
           res,
           await operation(p, res, (signal) =>
-            runPlanner(p, c, payload.message, signal),
+            runPlanner(p, c, payload.message, signal, {
+              webSearch: payload.webSearch,
+            }),
           ),
         );
       }

@@ -434,6 +434,43 @@ function validateGenerated(value, relative) {
   )
     throw new AppError('Invalid study material.');
 }
+function validMessageSearch(message) {
+  if (message.webSearch === undefined) return true;
+  const search = message.webSearch;
+  return Boolean(
+    message.role === 'assistant' &&
+      search &&
+      typeof search.query === 'string' &&
+      search.query.length <= 500 &&
+      ['ok', 'no-results', 'unavailable'].includes(search.status) &&
+      Array.isArray(search.sources) &&
+      search.sources.length <= 5 &&
+      (search.status === 'ok'
+        ? ['Exa', 'Purili'].includes(search.provider) &&
+          search.sources.length > 0
+        : search.provider === undefined && search.sources.length === 0) &&
+      search.sources.every((source) => {
+        if (
+          !source ||
+          typeof source.title !== 'string' ||
+          source.title.length > 300 ||
+          typeof source.url !== 'string' ||
+          source.url.length > 2000
+        )
+          return false;
+        try {
+          const url = new URL(source.url);
+          return (
+            ['https:', 'http:'].includes(url.protocol) &&
+            !url.username &&
+            !url.password
+          );
+        } catch {
+          return false;
+        }
+      }),
+  );
+}
 function validateSession(value, relative) {
   if (
     !value ||
@@ -450,6 +487,7 @@ function validateSession(value, relative) {
         !validId(m.id) ||
         !['user', 'assistant'].includes(m.role) ||
         typeof m.content !== 'string' ||
+        !validMessageSearch(m) ||
         (m.question !== undefined &&
           (m.role !== 'assistant' ||
             !m.question ||
@@ -540,7 +578,8 @@ function validatePlanner(value) {
       (m) =>
         !m ||
         !['assistant', 'user'].includes(m.role) ||
-        typeof m.content !== 'string',
+        typeof m.content !== 'string' ||
+        !validMessageSearch(m),
     )
   )
     throw new AppError('Invalid curriculum conversation.');
