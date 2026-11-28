@@ -86,37 +86,43 @@ jobs:
       - name: Install JS dependencies
         if: steps.head_check.outputs.skip != 'true'
         run: npm ci
+      # Only the .app is bundled here. Hosted macOS runners intermittently fail
+      # Tauri's bundle_dmg.sh with `hdiutil: create failed - Resource busy`
+      # (Spotlight and XProtectBehaviourService still holding the new image), and
+      # the vendored create-dmg never retries that case. The disk images are
+      # created below instead, with their own retries.
       - name: Build Apple Silicon macOS bundle
         if: steps.head_check.outputs.skip != 'true'
         env:
           CI: "true"
-        run: cargo tauri build --target aarch64-apple-darwin --bundles dmg
+        run: cargo tauri build --target aarch64-apple-darwin --bundles app
       - name: Build Intel macOS bundle
         if: steps.head_check.outputs.skip != 'true'
         env:
           CI: "true"
-        run: cargo tauri build --target x86_64-apple-darwin --bundles dmg
+        run: cargo tauri build --target x86_64-apple-darwin --bundles app
       - name: Package release assets
         if: steps.head_check.outputs.skip != 'true'
         shell: bash
         run: |
           set -euo pipefail
-          shopt -s nullglob
           assets_dir="$RUNNER_TEMP/release-assets"
           mkdir -p "$assets_dir"
           bash scripts/package-release.sh "$assets_dir/minilearn.zip" "$GITHUB_SHA"
-          arm64_dmgs=(src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg)
-          intel_dmgs=(src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg)
-          if [[ ${#arm64_dmgs[@]} -ne 1 ]]; then
-            echo "Expected 1 Apple Silicon .dmg, found ${#arm64_dmgs[@]}" >&2
-            exit 1
-          fi
-          if [[ ${#intel_dmgs[@]} -ne 1 ]]; then
-            echo "Expected 1 Intel .dmg, found ${#intel_dmgs[@]}" >&2
-            exit 1
-          fi
-          cp "${arm64_dmgs[0]}" "$assets_dir/minilearn-mac-apple-silicon.dmg"
-          cp "${intel_dmgs[0]}" "$assets_dir/minilearn-mac-intel.dmg"
+          package_arch() {
+            local target="$1" suffix="$2"
+            local app="src-tauri/target/$target/release/bundle/macos/minilearn.app"
+            local dmg="$assets_dir/minilearn-mac-$suffix.dmg"
+            if bash scripts/create-dmg.sh "$app" "$dmg"; then
+              return 0
+            fi
+            # Still ship something openable if the image never succeeds.
+            echo "::warning::Could not create the $suffix .dmg; packaging the app bundle as a zip instead."
+            ditto -c -k --sequesterRsrc --keepParent "$app" "$assets_dir/minilearn-mac-$suffix.zip"
+          }
+          package_arch aarch64-apple-darwin apple-silicon
+          package_arch x86_64-apple-darwin intel
+          ls -lh "$assets_dir"
       - name: Publish the latest tested main build
         if: steps.head_check.outputs.skip != 'true'
         env:
@@ -132,30 +138,34 @@ jobs:
           fi
           tag="build-$GITHUB_SHA"
           assets_dir="$RUNNER_TEMP/release-assets"
-          assets=(
-            minilearn-mac-apple-silicon.dmg
-            minilearn-mac-intel.dmg
-            minilearn.zip
-          )
+          # Publish whatever was packaged: both .dmg images, or a zipped .app
+          # for an architecture whose disk image could not be created.
+          assets=()
+          while IFS= read -r path; do
+            assets+=("$path")
+          done < <(find "$assets_dir" -maxdepth 1 -type f | sort)
+          if [[ ${#assets[@]} -eq 0 ]]; then
+            echo "No release assets were packaged." >&2
+            exit 1
+          fi
+          notes="Tested main build. Download the Mac .dmg for Apple Silicon or Intel, or minilearn.zip to run from source. Commit: $GITHUB_SHA."
           if gh release view "$tag" >/dev/null 2>&1; then
             # A retry can finish a draft or missing upload without replacing
             # the contents of a previously published release.
             existing=$(gh release view "$tag" --json assets --jq '.assets[].name')
-            for name in "${assets[@]}"; do
+            for path in "${assets[@]}"; do
+              name=$(basename "$path")
               if ! printf '%s\n' "$existing" | grep -Fxq "$name"; then
-                gh release upload "$tag" "$assets_dir/$name"
+                gh release upload "$tag" "$path"
               fi
             done
             if [[ "$(gh release view "$tag" --json isDraft --jq '.isDraft')" == true ]]; then
               gh release edit "$tag" --draft=false --latest
             fi
           else
-            gh release create "$tag" \
-              "$assets_dir/minilearn-mac-apple-silicon.dmg" \
-              "$assets_dir/minilearn-mac-intel.dmg" \
-              "$assets_dir/minilearn.zip" \
+            gh release create "$tag" "${assets[@]}" \
               --target "$GITHUB_SHA" \
               --title "minilearn (${GITHUB_SHA:0:7})" \
-              --notes "Tested main build. Download the Mac .dmg for Apple Silicon or Intel, or minilearn.zip to run from source. Commit: $GITHUB_SHA." \
+              --notes "$notes" \
               --latest
           fi
