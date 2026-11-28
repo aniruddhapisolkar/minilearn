@@ -6,3 +6,9 @@ data/
 .DS_Store
 coverage/
 *.log
+src-tauri/target/
+src-tauri/vendor/
+src-tauri/gen/
+*.dmg
+*.app/
+

@@ -17,11 +17,26 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+  rust-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: node scripts/prepare-tauri-assets.mjs
+      - run: cargo test --manifest-path src-tauri/Cargo.toml
   release:
-    name: Publish minilearn.zip
-    needs: test
+    name: Publish minilearn release
+    needs: [test, rust-test]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     permissions:
       contents: write
     concurrency:
@@ -31,9 +46,79 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Package the tested commit
-        run: bash scripts/package-release.sh "$RUNNER_TEMP/minilearn.zip" "$GITHUB_SHA"
+      - name: Check if this commit is still main HEAD
+        id: head_check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          head=$(gh api "repos/$GH_REPO/git/ref/heads/main" --jq '.object.sha')
+          if [[ "$head" != "$GITHUB_SHA" ]]; then
+            echo "A newer commit is on main; skipping this older build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-node@v4
+        if: steps.head_check.outputs.skip != 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.head_check.outputs.skip != 'true'
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        if: steps.head_check.outputs.skip != 'true'
+        with:
+          workspaces: src-tauri
+      - uses: taiki-e/install-action@v2
+        if: steps.head_check.outputs.skip != 'true'
+        with:
+          tool: cargo-binstall
+      - name: Install Tauri CLI
+        if: steps.head_check.outputs.skip != 'true'
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: cargo binstall "tauri-cli@^2" --no-confirm --locked
+      - name: Install JS dependencies
+        if: steps.head_check.outputs.skip != 'true'
+        run: npm ci
+      - name: Build Apple Silicon macOS bundle
+        if: steps.head_check.outputs.skip != 'true'
+        env:
+          CI: "true"
+        run: cargo tauri build --target aarch64-apple-darwin --bundles dmg
+      - name: Build Intel macOS bundle
+        if: steps.head_check.outputs.skip != 'true'
+        env:
+          CI: "true"
+        run: cargo tauri build --target x86_64-apple-darwin --bundles dmg
+      - name: Package release assets
+        if: steps.head_check.outputs.skip != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          assets_dir="$RUNNER_TEMP/release-assets"
+          mkdir -p "$assets_dir"
+          bash scripts/package-release.sh "$assets_dir/minilearn.zip" "$GITHUB_SHA"
+          arm64_dmgs=(src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg)
+          intel_dmgs=(src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg)
+          if [[ ${#arm64_dmgs[@]} -ne 1 ]]; then
+            echo "Expected 1 Apple Silicon .dmg, found ${#arm64_dmgs[@]}" >&2
+            exit 1
+          fi
+          if [[ ${#intel_dmgs[@]} -ne 1 ]]; then
+            echo "Expected 1 Intel .dmg, found ${#intel_dmgs[@]}" >&2
+            exit 1
+          fi
+          cp "${arm64_dmgs[0]}" "$assets_dir/minilearn-mac-apple-silicon.dmg"
+          cp "${intel_dmgs[0]}" "$assets_dir/minilearn-mac-intel.dmg"
       - name: Publish the latest tested main build
+        if: steps.head_check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -46,19 +131,31 @@ jobs:
             exit 0
           fi
           tag="build-$GITHUB_SHA"
-          archive="$RUNNER_TEMP/minilearn.zip"
+          assets_dir="$RUNNER_TEMP/release-assets"
+          assets=(
+            minilearn-mac-apple-silicon.dmg
+            minilearn-mac-intel.dmg
+            minilearn.zip
+          )
           if gh release view "$tag" >/dev/null 2>&1; then
             # A retry can finish a draft or missing upload without replacing
             # the contents of a previously published release.
-            if [[ "$(gh release view "$tag" --json assets --jq '[.assets[] | select(.name == "minilearn.zip")] | length')" == 0 ]]; then
-              gh release upload "$tag" "$archive"
-            fi
+            existing=$(gh release view "$tag" --json assets --jq '.assets[].name')
+            for name in "${assets[@]}"; do
+              if ! printf '%s\n' "$existing" | grep -Fxq "$name"; then
+                gh release upload "$tag" "$assets_dir/$name"
+              fi
+            done
             if [[ "$(gh release view "$tag" --json isDraft --jq '.isDraft')" == true ]]; then
               gh release edit "$tag" --draft=false --latest
             fi
           else
-            gh release create "$tag" "$archive" --target "$GITHUB_SHA" \
+            gh release create "$tag" \
+              "$assets_dir/minilearn-mac-apple-silicon.dmg" \
+              "$assets_dir/minilearn-mac-intel.dmg" \
+              "$assets_dir/minilearn.zip" \
+              --target "$GITHUB_SHA" \
               --title "minilearn (${GITHUB_SHA:0:7})" \
-              --notes "Tested main build. Download minilearn.zip, extract it, and run npm start inside minilearn. Commit: $GITHUB_SHA." \
+              --notes "Tested main build. Download the Mac .dmg for Apple Silicon or Intel, or minilearn.zip to run from source. Commit: $GITHUB_SHA." \
               --latest
           fi

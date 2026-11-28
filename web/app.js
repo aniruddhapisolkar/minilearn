@@ -984,16 +984,21 @@ function pasteOutline() {
       };
       $('#replace-outline', dialog).onclick = async () => {
         try {
-          if (
-            state.project.curriculum.length &&
-            !window.confirm(
+          const apply = async () => {
+            await saveCurriculum(curriculum);
+            closeDialog();
+            go('curriculum');
+          };
+          if (state.project.curriculum.length) {
+            confirmDialog(
+              'Replace curriculum',
               'Replace the existing curriculum? Learning history will be kept.',
-            )
-          )
+              apply,
+              'Replace curriculum',
+            );
             return;
-          await saveCurriculum(curriculum);
-          closeDialog();
-          go('curriculum');
+          }
+          await apply();
         } catch (err) {
           toast(errorMessage(err), true);
         }
@@ -1465,9 +1470,27 @@ function categoriesDialog(type) {
       const categories = values.getAll('category');
       if (!categories.length) throw new Error('Select at least one category.');
       if (exporting) {
-        const res = await fetch(
-          purl(`/export?include=${encodeURIComponent(categories.join(','))}`),
+        const exportUrl = purl(
+          `/export?include=${encodeURIComponent(categories.join(','))}`,
         );
+        if (window.__MINILEARN_DESKTOP__) {
+          const head = await fetch(exportUrl, { method: 'HEAD' });
+          if (!head.ok) {
+            const res = await fetch(exportUrl);
+            const error = await res.json().catch(() => ({}));
+            throw new Error(error.error || 'Export failed.');
+          }
+          const link = document.createElement('a');
+          link.href = exportUrl;
+          link.download = `${state.project.name}.learn`;
+          link.hidden = true;
+          (dialog.open ? dialog : document.body).appendChild(link);
+          link.click();
+          link.remove();
+          toast('Project exported.');
+          return;
+        }
+        const res = await fetch(exportUrl);
         if (!res.ok) {
           const error = await res.json();
           throw new Error(error.error || 'Export failed.');
